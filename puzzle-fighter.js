@@ -1,7 +1,6 @@
 //need help with debugging?
 //uncomment the line below to see the game state for each Gem pair
 //seeStates = true;
-let util = require('util');
 
 function puzzleFighter(arr){
 	//your code goes here. you can do it!
@@ -10,8 +9,8 @@ function puzzleFighter(arr){
     pair: null
   };
   for (let [pair, moves] of arr) {
+    // console.log(pair, moves);
     addPair(gameState, pair);
-    printState(gameState);
     moves.split('').forEach(function(move){
       makeMove(gameState, move);
     });
@@ -22,10 +21,14 @@ function puzzleFighter(arr){
       if (!dropped) break;
       // check for collisions
       let collisions = checkForCollisions(gameState);
-      console.log(collisions);
+      for (let collision of collisions) {
+        applyCollision(gameState, collision);
+      }
     }
-    printState(gameState);
+    // printState(gameState);
+    // console.log('\n');
   }
+  return gameState.board.map((row) => row.join('')).join('\n');
 }
 
 function makeMove(gs, move) {
@@ -48,7 +51,9 @@ function makeMove(gs, move) {
 }
 
 function printState(gs) {
-  console.log(util.inspect(gs, { showHidden: true, depth: null, colors: true }));
+  // console.log(util.inspect(gs, { showHidden: true, depth: null, colors: true }));
+  // console.log(gs.board);
+  console.log(gs.board.map((row) => '|'+row.join('')+'|').join('\n'));
 }
 
 function addPair(gs, pair) {
@@ -59,36 +64,8 @@ function addPair(gs, pair) {
     str: pair,
     align: 0,
     pos: [[0, 3],[1, 3]],
-    complete: [false, false],
   };
 }
-
-// function moveDown(gs){
-//   if (!gs.pair) throw new Error('No active pair');
-//   let lowests = [];
-//   switch (gs.pair.align) {
-//     case 0: lowests = [1]; break;
-//     case 1: lowests = [0,1]; break;
-//     case 2: lowests = [0]; break;
-//     case 3: lowests = [0,1]; break;
-//     default: break
-//   }
-//   // Check for collisions
-//   let newPos = [[...gs.pair.pos[0]],[...gs.pair.pos[1]]];
-//   for (let lowest of lowests) {
-//     if (gs.board[gs.pair.pos[lowest][0]+1][gs.pair.pos[lowest][1]] !== ' ') {
-//       continue;
-//     }
-//     newPos[lowest][0] += 1;
-//   }
-//   if (gs.pair.align === 0) {
-//     newPos[0][0] = newPos[1][0] - 1;
-//   }else if (gs.pair.align === 2) {
-//     newPos[1][0] = newPos[0][0] - 1;
-//   }
-//   updateBoard(gs, newPos);
-//   gs.pair.pos = newPos;
-// }
 
 function checkForCollisions(gs) {
   let collisions = [];
@@ -111,6 +88,49 @@ function checkForCollisions(gs) {
     }
   }
   return collisions;
+}
+
+function applyCollision(gs, collision) {
+  let collider = gs.board[collision[0]][collision[1]];
+  let toRemove = [collision];
+  let toCheck = [collision];
+  let checked = [];
+  if (collider === '0') {
+    // TODO: case with rainbow
+  } else {
+    let color = collider.toUpperCase();
+    while (toCheck.length) {
+      let [i, j] = toCheck.shift();
+      checked.push([i, j]);
+      if (i > 0 && gs.board[i-1][j] === color) {
+        if(!checked.find(t => t[0] === i-1 && t[1] === j)) {
+          toRemove.push([i-1, j]);
+          toCheck.push([i-1, j]);
+        }
+      }
+      if(i < 11 && gs.board[i+1][j] === color) {
+        if(!checked.find(t => t[0] === i+1 && t[1] === j)) {
+          toRemove.push([i+1, j]);
+          toCheck.push([i+1, j]);
+        }
+      }
+      if(j > 0 && gs.board[i][j-1] === color) {
+        if(!checked.find(t => t[0] === i && t[1] === j-1)) {
+          toRemove.push([i, j-1]);
+          toCheck.push([i, j-1]);
+        }
+      }
+      if(j < 5 && gs.board[i][j+1] === color) {
+        if(!checked.find(t => t[0] === i && t[1] === j+1)) {
+          toRemove.push([i, j+1]);
+          toCheck.push([i, j+1]);
+        }
+      }
+    }
+    for (let [i, j] of toRemove) {
+      gs.board[i][j] = ' ';
+    }
+  }
 }
 
 function drop(gs) {
@@ -229,4 +249,4 @@ let test1 = [
   ['bR','ALLL'],
   ['gy','AAL']
 ];
-puzzleFighter(test1)
+puzzleFighter(test1);
