@@ -1,7 +1,7 @@
 //need help with debugging?
 //uncomment the line below to see the game state for each Gem pair
 seeStates = true;
-let logging = true;
+let logging = false;
 function puzzleFighter(arr){
   console.log(arr);
 	//your code goes here. you can do it!
@@ -73,7 +73,6 @@ function testPowerGems() {
 }
 
 function findPowerGems(gs) {
-  let boardcopy = [...gs.board.map((row) => [...row])];
   let colors = Array.from(gs.board.reduce((c, row) => {
     for (let ele of row) {
       if (ele !== ' ') {
@@ -120,18 +119,37 @@ function findPowerGems(gs) {
           min = newMin;
           max = newMax;
           currentWidth += 1;
-        }
-        if (currentWidth > 1) {
-          possibleGems.push([min, i, max - min, currentWidth]); // row, col, height, width
-          // Remove this line as an option
-          for (let k = i; k < i + currentWidth; k++) {
-            for (let i = 0; i < lines.length; i++) {
-              lines[k] = lines[k].map((l) => {
-                if (l[1] < min) return l;
-                return [max, max];
-              })
-            }
+          if (currentWidth > 1) {
+            possibleGems.push([min, i, max - min, currentWidth]); // row, col, height, width
           }
+        }
+      }
+    }
+    // Sort the gems in terms of height, then by volume
+    possibleGems = possibleGems.sort((a, b) => {
+      if (a[0] < b[0]) return 1;
+      if (a[0] === b[0]) {
+        if (a[2] * a[3] < b[2] * b[3]) return 1;
+        return 0;
+      }
+      return -1;
+    });
+    // Filter out the ones that overlap
+    for (let i = 0; i < possibleGems.length; i++) {
+      for (let j = possibleGems.length-1; j > i; j--) {
+        // two gems overlap if
+        let [row1, col1, height1, width1] = possibleGems[i];
+        let [row2, col2, height2, width2] = possibleGems[j]
+        if (
+          (
+            row1 <= row2 && row2 < (row1 + height1) &&
+            col1 <= col2 && col2 < (col1 + width1)
+          ) || (
+            row2 <= row1 && row1 < (row2 + height2) &&
+            col2 <= col1 && col1 < (col2 + width2)
+          )
+        ) {
+          possibleGems.splice(j, 1);
         }
       }
     }
