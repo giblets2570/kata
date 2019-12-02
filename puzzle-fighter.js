@@ -1,7 +1,9 @@
 //need help with debugging?
 //uncomment the line below to see the game state for each Gem pair
 seeStates = true;
+let logging = true;
 function puzzleFighter(arr){
+  console.log(arr);
 	//your code goes here. you can do it!
   let gameState = {
     board: Array(12).fill().map(() => Array(6).fill(' ')),
@@ -24,7 +26,7 @@ function puzzleFighter(arr){
       break;
     }
 
-    // console.log(`PAIR ${pairIndex}: ${pair} | MOVE: ${moves}`)
+    if(logging) console.log(`PAIR ${pairIndex}: ${pair} | MOVE: ${moves}`)
 
     updateBoard(gameState, gameState.pair.newPos, 'board');
     // remove pair
@@ -33,16 +35,16 @@ function puzzleFighter(arr){
     let checker = 0;
     while(true) {
       let dropped = drop(gameState);
-      if (!dropped) break;
       // check for collisions
       let collisions = checkForCollisions(gameState);
       for (let collision of collisions) {
         applyCollision(gameState, collision);
       }
       gameState.gems = findPowerGems(gameState);
+      if (!dropped) break;
     }
-    // printState(gameState);
-    // console.log('\n')
+    if(logging) printState(gameState);
+    if(logging) console.log('\n')
   }
   // printState(gameState);
   return gameState.board.map((row) => row.join('')).join('\n');
@@ -401,74 +403,36 @@ function checkNewPos(gs, newPos, board='blank') {
     );
   }
   if (cantMove) {
-    // console.log(gs.pair.pos);
-    // console.log(gs.pair.newPos);
-    // console.log(gs.blank)
     throw new Error(`Can't move to new pos`)
   }
 }
-// PAIR 0: GY | MOVE: LL
+
 function updateBoard(gs, newPos, board='blank') {
-  // console.log(gs.pair.pos);
-  // console.log(gs.pair.newPos);
   if (board === 'blank') {
-    gs[board][gs.pair.newPos[0][0]][gs.pair.newPos[0][1]] = ' ';
-    gs[board][gs.pair.newPos[1][0]][gs.pair.newPos[1][1]] = ' ';
+    gs.blank[gs.pair.newPos[0][0]][gs.pair.newPos[0][1]] = ' ';
+    gs.blank[gs.pair.newPos[1][0]][gs.pair.newPos[1][1]] = ' ';
   } else {
-    gs[board][gs.pair.pos[0][0]][gs.pair.pos[0][1]] = ' ';
-    gs[board][gs.pair.pos[1][0]][gs.pair.pos[1][1]] = ' ';
+    gs.board[gs.pair.pos[0][0]][gs.pair.pos[0][1]] = ' ';
+    gs.board[gs.pair.pos[1][0]][gs.pair.pos[1][1]] = ' ';
   }
   gs[board][newPos[0][0]][newPos[0][1]] = gs.pair.str[0];
   gs[board][newPos[1][0]][newPos[1][1]] = gs.pair.str[1];
-
 }
 
 let tests = [
-  // [
-  //   ['BR','LLL'],
-  //   ['BY','LL'],['BG','ALL'],['BY','BRR'],['RR','AR'],['GY','A'],['BB','AALLL'],['GR','A'],['RY','LL'],['GG','L'],['GY','BB'],['bR','ALLL'],['gy','AAL']
-  // ],
-  // [['GR','ALLL'],['GG','ALLL'],['RG','AAL'],['RB','BLL'],['RG','ALL'],['BB','RR'],['BR','BB'],['BR','ALLL'],['YB','R'],['BG','BBRR'],['YR','AAR'],['RR','L'],['RR','ABLL'],['GY','BRR'],['BB','R'],['gB','RR'],['BR','ALL'],['Gr','BB'],['Rb','R'],['GG','B'],['bB','LL']],
-  // [['RR','LLL'],['GG','LL'],['RG','BBL'],['GY','AR'],['RR','BBLLL'],['RB','AALL'],['GR','B'],['GB','AR'],['RR',''],['GG','R'],['YR','BR'],['RR','LLL'],['BR','AALL'],['Bg',''],['RR','BBBBLLL'],['GR','ALLL'],['bR','L'],['YG','BBBALL'],['RR','L'],['YB','AL']],
-  // [['BB','LLLL'],['BB','LL'],['BB','L'],['BB','LLL'],['BB','LL'],['BG','L'],['BB',''],['BB','R'],['RB','BBRRR'],['RR','LLL'],['RR','BALL'],['RR',''],['RR','R'],['RR','L'],['RR','B'],['RR','LLL'],['RR','LL'],['RR','BLLL'],['RR','B'],['YR','ALL'],['GR','AL'],['Rb','RRRR']],
-  // [['YY','BALLL'],['RR','AALL'],['RG','BR'],['YG','ALLR'],['BG','BRR'],['YR','BBLLLL'],['GR','BL'],['GG','ALB'],['GY',''],['yB','RR'],['GG','R'],['RB','LLLAAAB'],['Ry','LL'],['BG','BR'],['RB','BBRRR'],['Rg','R'],['bR','L'],['YR','BLLL'],['RR','LLLLLLLL'],['Yg','AALL'],['Br','LLL']],
-  // [['RY','ALLL'],['YY','L'],['RG','BBR'],['YR','BLL'],['RR','ALLLL'],['GY','B'],['RR','RRRRRRR'],['RY','ALLL'],['BY','BBBBLL'],['BY','L'],['BG','BBBL'],['BB','LLL'],['BY','BBLL'],['BR','AL'],['RB','AR'],['BB','RR'],['GG','R'],['YB','LLLRR'],['GG',''],['rb','RR'],['bY','ABLL'],['GY','L'],['GR','BRR'],['RR','LLL'],['yy','LLLB'],['RY','BB']],
-  [ [ 'GY', 'LL' ],
-  [ 'BG', 'R' ],
-  [ 'BB', 'BR' ],
-  [ 'GG', 'BR' ],
-  [ 'RG', 'AAL' ],
-  [ 'GB', 'BBRR' ],
-  [ 'YG', 'RR' ],
-  [ 'YG', 'BRR' ],
-  [ 'BG', 'LL' ],
-  [ 'GB', '' ],
-  [ 'RR', 'R' ],
-  [ 'YR', 'AAAA' ],
-  [ 'RB', 'RRA' ],
-  [ 'YB', 'BB' ],
-  [ 'BY', 'LLLB' ],
-  [ 'bY', 'R' ],
-  [ 'GB', 'L' ],
-  [ 'RR', 'L' ],
-  [ '0G', 'AARR' ],
-  [ 'RB', 'AAL' ],
-  [ 'GB', 'ALL' ],
-  [ 'yB', 'R' ],
-  [ 'Br', 'LLLA' ],
-  [ 'BY', 'L' ],
-  [ 'GR', 'ALL' ],
-  [ 'B0', 'L' ],
-  [ 'rY', 'ALL' ],
-  [ 'RB', 'ALLL' ],
-  [ 'BR', 'ALL' ],
-  [ 'RR', 'LLLLR' ],
-  [ 'GY', 'ALLL' ],
-  [ 'BB', 'LL' ],
-  [ '0G', 'RRA' ],
-  [ 'yr', 'AALL' ] ]
+  [ [ 'RR', 'L' ],
+  [ 'RR', 'LR' ],
+  [ 'RR', 'LA' ],
+  [ 'RR', 'LA' ],
+  [ 'GG', 'LRR' ],
+  [ 'RR', 'LRR' ],
+  [ 'Gg', 'LRRR' ],
+  [ 'YB', 'LLRLRR' ],
+  [ 'YR', 'BBLR' ],
+  [ 'GB', 'ALRRRL' ] ]
 ]
 
 for (let test of tests) {
-  console.log(puzzleFighter(test));
+  let result = puzzleFighter(test);
+  // console.log(result.split('\n').map((r) => '|' + r + '|').join('\n'))
 }
