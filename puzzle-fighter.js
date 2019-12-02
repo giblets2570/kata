@@ -1,35 +1,50 @@
 //need help with debugging?
 //uncomment the line below to see the game state for each Gem pair
-//seeStates = true;
+seeStates = true;
 function puzzleFighter(arr){
 	//your code goes here. you can do it!
   let gameState = {
     board: Array(12).fill().map(() => Array(6).fill(' ')),
+    blank: Array(12).fill().map(() => Array(6).fill(' ')),
     pair: null,
     gems: {},
   };
+  let pairIndex = 0;
   for (let [pair, moves] of arr) {
-    // console.log(pair, moves);
+    pairIndex += 1;
     addPair(gameState, pair);
+
     moves.split('').forEach(function(move){
+      // console.log(gameState.pair)
       makeMove(gameState, move);
     });
+    try {
+      checkNewPos(gameState, gameState.pair.newPos, 'board');
+    } catch (e) {
+      break;
+    }
+
+    // console.log(`PAIR ${pairIndex}: ${pair} | MOVE: ${moves}`)
+
+    updateBoard(gameState, gameState.pair.newPos, 'board');
     // remove pair
+    gameState.blank = Array(12).fill().map(() => Array(6).fill(' '));
     gameState.pair = null;
     let checker = 0;
     while(true) {
       let dropped = drop(gameState);
       if (!dropped) break;
       // check for collisions
-      gameState.gems = findPowerGems(gameState);
       let collisions = checkForCollisions(gameState);
       for (let collision of collisions) {
         applyCollision(gameState, collision);
       }
+      gameState.gems = findPowerGems(gameState);
     }
     // printState(gameState);
-    // console.log('\n');
+    // console.log('\n')
   }
+  // printState(gameState);
   return gameState.board.map((row) => row.join('')).join('\n');
 }
 
@@ -106,9 +121,14 @@ function findPowerGems(gs) {
         }
         if (currentWidth > 1) {
           possibleGems.push([min, i, max - min, currentWidth]); // row, col, height, width
-          // Remove this as an option
+          // Remove this line as an option
           for (let k = i; k < i + currentWidth; k++) {
-            lines[k][li] = [max, max];
+            for (let i = 0; i < lines.length; i++) {
+              lines[k] = lines[k].map((l) => {
+                if (l[1] < min) return l;
+                return [max, max];
+              })
+            }
           }
         }
       }
@@ -147,12 +167,13 @@ function printState(gs) {
 
 function addPair(gs, pair) {
   if (gs.pair) throw new Error('Already active pair');
-  gs.board[0][3] = pair[0];
-  gs.board[1][3] = pair[1];
+  gs.blank[0][3] = pair[0];
+  gs.blank[1][3] = pair[1];
   gs.pair = {
     str: pair,
     align: 0,
     pos: [[0, 3],[1, 3]],
+    newPos: [[0, 3],[1, 3]],
   };
 }
 
@@ -160,19 +181,19 @@ function checkForCollisions(gs) {
   let collisions = [];
   for (let i = gs.board.length - 1; i >= 0; i--) {
     for (let j = 0; j < gs.board[i].length; j++) {
-      if (gs.board[i][j] > 'Z') { // lowercase
+      if (gs.board[i][j] === '0') {
+        collisions.push([i, j]);
+      } else if (gs.board[i][j] > 'Z') { // lowercase
         // Check if there are any touching
         let color = gs.board[i][j].toUpperCase();
         if (
           (i > 0 && gs.board[i-1][j] === color) ||
           (i < 11 && gs.board[i+1][j] === color) ||
           (j > 0 && gs.board[i][j-1] === color) ||
-          (i < 5 && gs.board[i][j+1] === color)
+          (j < 5 && gs.board[i][j+1] === color)
         ) {
           collisions.push([i, j]);
         }
-      } else if (gs.board[i][j] === '0') {
-        collisions.push([i, j]);
       }
     }
   }
@@ -186,6 +207,18 @@ function applyCollision(gs, collision) {
   let checked = [];
   if (collider === '0') {
     // TODO: case with rainbow
+    let [i, j] = toCheck.shift();
+    if (i !== 11) {
+      // it is not on the floor
+      let color = gs.board[i+1][j];
+      for (let row = 0; row < 12; row++) {
+        for (var col = 0; col < 6; col++) {
+          if (gs.board[row][col].toUpperCase() === color) {
+            toRemove.push([row, col]);
+          }
+        }
+      }
+    }
   } else {
     let color = collider.toUpperCase();
     while (toCheck.length) {
@@ -216,9 +249,9 @@ function applyCollision(gs, collision) {
         }
       }
     }
-    for (let [i, j] of toRemove) {
-      gs.board[i][j] = ' ';
-    }
+  }
+  for (let [i, j] of toRemove) {
+    gs.board[i][j] = ' ';
   }
 }
 
@@ -289,7 +322,7 @@ function drop(gs) {
 function rotate(gs, rotation) {
   if (!gs.pair) throw new Error('No active pair');
   // -1, anticlock +1 clock
-  let newPos = [[...gs.pair.pos[0]],[...gs.pair.pos[1]]];
+  let newPos = [[...gs.pair.newPos[0]],[...gs.pair.newPos[1]]];
   let newAlign = (gs.pair.align + rotation + 4) % 4;
   switch (newAlign) {
     case 0:
@@ -310,17 +343,17 @@ function rotate(gs, rotation) {
       }
       break;
     case 3:
+      newPos[1] = [newPos[0][0],newPos[0][1]+1];
       if (newPos[1][1] > 5) {
         newPos[0][1] -= 1;
         newPos[1][1] -= 1;
       }
-      newPos[1] = [newPos[0][0],newPos[0][1]+1];
       break;
     default: break
   }
-  checkNewPos(gs, newPos, [1]);
+  checkNewPos(gs, newPos);
   updateBoard(gs, newPos);
-  gs.pair.pos = newPos;
+  gs.pair.newPos = newPos;
   gs.pair.align = newAlign;
 }
 
@@ -328,62 +361,114 @@ function moveDirection(gs, direction) {
   // -1 left, +1 right
   if (!gs.pair) throw new Error('No active pair');
   if (direction === -1) {
-    if (gs.pair.pos[0][1] === 0 || gs.pair.pos[1][1] === 0) {
+    if (gs.pair.newPos[0][1] === 0 || gs.pair.newPos[1][1] === 0) {
       // throw new Error(`Can't move left`)
       return `Can't move left`
     }
   } else {
-    if (gs.pair.pos[0][1] === 5 || gs.pair.pos[1][1] === 5) {
+    if (gs.pair.newPos[0][1] === 5 || gs.pair.newPos[1][1] === 5) {
       // throw new Error(`Can't move right`)
       return `Can't move right`
     }
   }
-  let newPos = [[...gs.pair.pos[0]],[...gs.pair.pos[1]]];
+  let newPos = [[...gs.pair.newPos[0]],[...gs.pair.newPos[1]]];
   newPos[0][1] += direction;
   newPos[1][1] += direction;
   checkNewPos(gs, newPos);
   updateBoard(gs, newPos);
-  gs.pair.pos = newPos;
+  gs.pair.newPos = newPos;
 }
 
-function checkNewPos(gs, newPos, indices=[0,1]) {
-  for(let i of indices) {
-    if (newPos[i][0] < 0) {
-      throw new Error(`Can't move to new pos`)
-    }
-    gs.board[gs.pair.pos[0][0]][gs.pair.pos[0][1]] = ' ';
-    gs.board[gs.pair.pos[1][0]][gs.pair.pos[1][1]] = ' ';
-    let cantMove = gs.board[newPos[i][0]][newPos[i][1]] !== ' ';
-    gs.board[gs.pair.pos[0][0]][gs.pair.pos[0][1]] = gs.pair.str[0];
-    gs.board[gs.pair.pos[1][0]][gs.pair.pos[1][1]] = gs.pair.str[1];
-    if (cantMove) {
-      console.log(newPos[i][0], newPos[i][1])
-      throw new Error(`Can't move to new pos`)
-    }
+function checkNewPos(gs, newPos, board='blank') {
+  if (newPos[0][0] < 0 || newPos[1][0] < 0) {
+    throw new Error(`Can't move to new pos`)
+  }
+  let cantMove = false;
+  if (board === 'blank') {
+    gs.blank[gs.pair.newPos[0][0]][gs.pair.newPos[0][1]] = ' ';
+    gs.blank[gs.pair.newPos[1][0]][gs.pair.newPos[1][1]] = ' ';
+    // console.log(gs.blank)
+    cantMove = (
+      gs.blank[newPos[0][0]][newPos[0][1]] !== ' ' ||
+      gs.blank[newPos[1][0]][newPos[1][1]] !== ' '
+    );
+    gs.blank[gs.pair.newPos[0][0]][gs.pair.newPos[0][1]] = gs.pair.str[0];
+    gs.blank[gs.pair.newPos[1][0]][gs.pair.newPos[1][1]] = gs.pair.str[1];
+  } else {
+    cantMove = (
+      gs.board[gs.pair.newPos[0][0]][gs.pair.newPos[0][1]] !== ' ' ||
+      gs.board[gs.pair.newPos[1][0]][gs.pair.newPos[1][1]] !== ' '
+    );
+  }
+  if (cantMove) {
+    // console.log(gs.pair.pos);
+    // console.log(gs.pair.newPos);
+    // console.log(gs.blank)
+    throw new Error(`Can't move to new pos`)
   }
 }
+// PAIR 0: GY | MOVE: LL
+function updateBoard(gs, newPos, board='blank') {
+  // console.log(gs.pair.pos);
+  // console.log(gs.pair.newPos);
+  if (board === 'blank') {
+    gs[board][gs.pair.newPos[0][0]][gs.pair.newPos[0][1]] = ' ';
+    gs[board][gs.pair.newPos[1][0]][gs.pair.newPos[1][1]] = ' ';
+  } else {
+    gs[board][gs.pair.pos[0][0]][gs.pair.pos[0][1]] = ' ';
+    gs[board][gs.pair.pos[1][0]][gs.pair.pos[1][1]] = ' ';
+  }
+  gs[board][newPos[0][0]][newPos[0][1]] = gs.pair.str[0];
+  gs[board][newPos[1][0]][newPos[1][1]] = gs.pair.str[1];
 
-function updateBoard(gs, newPos) {
-  gs.board[gs.pair.pos[0][0]][gs.pair.pos[0][1]] = ' ';
-  gs.board[gs.pair.pos[1][0]][gs.pair.pos[1][1]] = ' ';
-  gs.board[newPos[0][0]][newPos[0][1]] = gs.pair.str[0];
-  gs.board[newPos[1][0]][newPos[1][1]] = gs.pair.str[1];
 }
 
-let test1 = [['BR','LLL'],['BY','LL'],['BG','ALL'],['BY','BRR'],['RR','AR'],['GY','A'],['BB','AALLL'],['GR','A'],['RY','LL'],['GG','L'],['GY','BB'],['bR','ALLL'],['gy','AAL']];
-let test2 = [['GR','ALLL'],['GG','ALLL'],['RG','AAL'],['RB','BLL'],['RG','ALL'],['BB','RR'],['BR','BB'],['BR','ALLL'],['YB','R'],['BG','BBRR'],['YR','AAR'],['RR','L'],['RR','ABLL'],['GY','BRR'],['BB','R'],['gB','RR'],['BR','ALL'],['Gr','BB'],['Rb','R'],['GG','B'],['bB','LL']];
-let test3 = [['RR','LLL'],['GG','LL'],['RG','BBL'],['GY','AR'],['RR','BBLLL'],['RB','AALL'],['GR','B'],['GB','AR'],['RR',''],['GG','R'],['YR','BR'],['RR','LLL'],['BR','AALL'],['Bg',''],['RR','BBBBLLL'],['GR','ALLL'],['bR','L'],['YG','BBBALL'],['RR','L'],['YB','AL']];
-let test4 = [['BB','LLLL'],['BB','LL'],['BB','L'],['BB','LLL'],['BB','LL'],['BG','L'],['BB',''],['BB','R'],['RB','BBRRR'],['RR','LLL'],['RR','BALL'],['RR',''],['RR','R'],['RR','L'],['RR','B'],['RR','LLL'],['RR','LL'],['RR','BLLL'],['RR','B'],['YR','ALL'],['GR','AL'],['Rb','RRRR']];
-puzzleFighter(test1);
-puzzleFighter(test2);
-puzzleFighter(test3);
-// puzzleFighter(test4);
-// testPowerGems();
-class ClassName {
-  k = {
+let tests = [
+  // [
+  //   ['BR','LLL'],
+  //   ['BY','LL'],['BG','ALL'],['BY','BRR'],['RR','AR'],['GY','A'],['BB','AALLL'],['GR','A'],['RY','LL'],['GG','L'],['GY','BB'],['bR','ALLL'],['gy','AAL']
+  // ],
+  // [['GR','ALLL'],['GG','ALLL'],['RG','AAL'],['RB','BLL'],['RG','ALL'],['BB','RR'],['BR','BB'],['BR','ALLL'],['YB','R'],['BG','BBRR'],['YR','AAR'],['RR','L'],['RR','ABLL'],['GY','BRR'],['BB','R'],['gB','RR'],['BR','ALL'],['Gr','BB'],['Rb','R'],['GG','B'],['bB','LL']],
+  // [['RR','LLL'],['GG','LL'],['RG','BBL'],['GY','AR'],['RR','BBLLL'],['RB','AALL'],['GR','B'],['GB','AR'],['RR',''],['GG','R'],['YR','BR'],['RR','LLL'],['BR','AALL'],['Bg',''],['RR','BBBBLLL'],['GR','ALLL'],['bR','L'],['YG','BBBALL'],['RR','L'],['YB','AL']],
+  // [['BB','LLLL'],['BB','LL'],['BB','L'],['BB','LLL'],['BB','LL'],['BG','L'],['BB',''],['BB','R'],['RB','BBRRR'],['RR','LLL'],['RR','BALL'],['RR',''],['RR','R'],['RR','L'],['RR','B'],['RR','LLL'],['RR','LL'],['RR','BLLL'],['RR','B'],['YR','ALL'],['GR','AL'],['Rb','RRRR']],
+  // [['YY','BALLL'],['RR','AALL'],['RG','BR'],['YG','ALLR'],['BG','BRR'],['YR','BBLLLL'],['GR','BL'],['GG','ALB'],['GY',''],['yB','RR'],['GG','R'],['RB','LLLAAAB'],['Ry','LL'],['BG','BR'],['RB','BBRRR'],['Rg','R'],['bR','L'],['YR','BLLL'],['RR','LLLLLLLL'],['Yg','AALL'],['Br','LLL']],
+  // [['RY','ALLL'],['YY','L'],['RG','BBR'],['YR','BLL'],['RR','ALLLL'],['GY','B'],['RR','RRRRRRR'],['RY','ALLL'],['BY','BBBBLL'],['BY','L'],['BG','BBBL'],['BB','LLL'],['BY','BBLL'],['BR','AL'],['RB','AR'],['BB','RR'],['GG','R'],['YB','LLLRR'],['GG',''],['rb','RR'],['bY','ABLL'],['GY','L'],['GR','BRR'],['RR','LLL'],['yy','LLLB'],['RY','BB']],
+  [ [ 'GY', 'LL' ],
+  [ 'BG', 'R' ],
+  [ 'BB', 'BR' ],
+  [ 'GG', 'BR' ],
+  [ 'RG', 'AAL' ],
+  [ 'GB', 'BBRR' ],
+  [ 'YG', 'RR' ],
+  [ 'YG', 'BRR' ],
+  [ 'BG', 'LL' ],
+  [ 'GB', '' ],
+  [ 'RR', 'R' ],
+  [ 'YR', 'AAAA' ],
+  [ 'RB', 'RRA' ],
+  [ 'YB', 'BB' ],
+  [ 'BY', 'LLLB' ],
+  [ 'bY', 'R' ],
+  [ 'GB', 'L' ],
+  [ 'RR', 'L' ],
+  [ '0G', 'AARR' ],
+  [ 'RB', 'AAL' ],
+  [ 'GB', 'ALL' ],
+  [ 'yB', 'R' ],
+  [ 'Br', 'LLLA' ],
+  [ 'BY', 'L' ],
+  [ 'GR', 'ALL' ],
+  [ 'B0', 'L' ],
+  [ 'rY', 'ALL' ],
+  [ 'RB', 'ALLL' ],
+  [ 'BR', 'ALL' ],
+  [ 'RR', 'LLLLR' ],
+  [ 'GY', 'ALLL' ],
+  [ 'BB', 'LL' ],
+  [ '0G', 'RRA' ],
+  [ 'yr', 'AALL' ] ]
+]
 
-  }
-  constructor() {
-
-  }
+for (let test of tests) {
+  console.log(puzzleFighter(test));
 }
