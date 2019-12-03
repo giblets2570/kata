@@ -11,48 +11,73 @@ function cut(cake){
   let piecesArea = cakeArea / numRaisins;
 
   let shapes = findShapes(height, width, piecesArea);
-  console.log(shapes)
+  let heightStep = gcd(shapes.map((s) => s[0]));
+  let widthStep = gcd(shapes.map((s) => s[1]));
+  console.log('heightStep:',heightStep);
+  console.log('widthStep:',widthStep);
   // Now recursively place shapes until i cant anymore
   let totalRaisinsUsed = 0;
   let usedShapes = [];
   let triedPlacements = {};
-  usedShapes = tryShapes(width, height, shapes, cakeArray, usedShapes, totalRaisinsUsed, triedPlacements);
-  return formatAnswer(cakeArray, usedShapes || []);
-}
 
-function tryShapes(width, height, shapes, cakeArray, usedShapes, totalRaisinsUsed, triedPlacements) {
-  for (let shape of shapes) {
-    for (let row = 0; row < height - shape[0] + 1; row ++) {
-      for (let col = 0; col < width - shape[1] + 1; col ++) {
-        if (['x','X'].includes(cakeArray[row][col])) continue;
-        if (canPlace(col, row, shape, cakeArray, triedPlacements)) {
-          let raisinsUsed = placeShape(col, row, shape, cakeArray);
-          // print(cakeArray)
-          if (raisinsUsed === 1) {
-            usedShapes.push({left: col, top: row, shape: shape});
-            totalRaisinsUsed += 1;
-            if (usedShapes.length === width * height / (shapes[0][0] * shapes[0][1])) {
-              // Done!!!
-              return usedShapes;
+  function fn(cakeArray, usedShapes, totalRaisinsUsed, triedPlacements) {
+    for (let shape of shapes) {
+      for (let row = 0; row < height - shape[0] + 1; row += heightStep) {
+        for (let col = 0; col < width - shape[1] + 1; col += widthStep) {
+          if (['x','X'].includes(cakeArray[row][col])) continue;
+          if (canPlace(col, row, shape, cakeArray, triedPlacements)) {
+            let raisinsUsed = placeShape(col, row, shape, cakeArray);
+            // print(cakeArray)
+            if (raisinsUsed === 1) {
+              usedShapes.push({left: col, top: row, shape: shape});
+              totalRaisinsUsed += 1;
+              if (usedShapes.length === width * height / (shapes[0][0] * shapes[0][1])) {
+                // Done!!!
+                return usedShapes;
+              }
+              let deeper = fn(cakeArray, usedShapes, totalRaisinsUsed, triedPlacements);
+              if (deeper) return deeper;
+              // Nothing has been found
+              usedShapes.pop();
+              totalRaisinsUsed -= 1;
             }
-            let deeper = tryShapes(width, height, shapes, cakeArray, usedShapes, totalRaisinsUsed, triedPlacements);
-            if (deeper) return deeper;
-            // Nothing has been found
-            usedShapes.pop();
-            totalRaisinsUsed -= 1;
+            removeShape(col, row, shape, cakeArray);
+            // print(cakeArray)
+            triedPlacements[[row,col,shape].toString()] = true;
           }
-          removeShape(col, row, shape, cakeArray);
-          // print(cakeArray)
-          triedPlacements[[row,col,shape].toString()] = true;
         }
       }
     }
+    return false;
   }
-  return false;
+
+  usedShapes = fn(cakeArray, usedShapes, totalRaisinsUsed, triedPlacements);
+  return formatAnswer(cake, cakeArray, usedShapes || []);
 }
 
-function formatAnswer(cakeArray, usedShapes) {
+function gcd2(a,b) { return (!b)?a:gcd2(b,a%b); };
+function gcd(nums) {
+	var factor = nums[0];
+	for(var i=1;i<nums.length;i++){
+	  factor = gcd2(factor,nums[i]);
+	}
+	return factor;
+}
+
+function formatAnswer(cake, cakeArray, usedShapes) {
   let result = [];
+  // first sort the usedShapes array
+  usedShapes = usedShapes.sort((a, b) => {
+    if (a.top < b.top) {
+      return -1;
+    } else if (a.top === b.top) {
+      if (a.left < b.left) {
+        return -1;
+      }
+      return 1;
+    }
+    return 1;
+  })
   for (let {left, top, shape} of usedShapes) {
     let cut = "";
     for (let i = top; i < top + shape[0]; i++) {
@@ -135,24 +160,24 @@ function removeShape(left, top, shape, cakeArray) {
 }
 
 var cake =
-// `.o............
-// ..............
-// .o........o...
-// ..............
-// o.........o...
-// ..........o...
-// ..............
-// ..o.......o...
-// ..........o...
-// ..............
-// ...o......o...`
-`...........................o..............
-..........................................
-.o........................................
-.....o....................................
-.......................................o..
-..............o...........................
-........................o.................
-.........o................................`
+`.o............
+..............
+.o........o...
+..............
+o.........o...
+..........o...
+..............
+..o.......o...
+..........o...
+..............
+...o......o...`
+// `...........................o..............
+// ..........................................
+// .o........................................
+// .....o....................................
+// .......................................o..
+// ..............o...........................
+// ........................o.................
+// .........o................................`
 
 console.log(cut(cake));
