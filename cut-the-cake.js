@@ -11,57 +11,54 @@ function cut(cake){
   let piecesArea = cakeArea / numRaisins;
 
   let shapes = findShapes(height, width, piecesArea);
-  let heightStep = gcd(shapes.map((s) => s[0]));
-  let widthStep = gcd(shapes.map((s) => s[1]));
-  console.log('heightStep:',heightStep);
-  console.log('widthStep:',widthStep);
   // Now recursively place shapes until i cant anymore
   let totalRaisinsUsed = 0;
   let usedShapes = [];
-  let triedPlacements = {};
+  let nextCorner = [0, 0];
 
-  function fn(cakeArray, usedShapes, totalRaisinsUsed, triedPlacements) {
+  function fn(cakeArray, usedShapes, totalRaisinsUsed, nextCorner) {
+    let [row, col] = nextCorner;
+    // console.log('totalRaisinsUsed:',totalRaisinsUsed)
+    // console.log(nextCorner);
     for (let shape of shapes) {
-      for (let row = 0; row < height - shape[0] + 1; row += heightStep) {
-        for (let col = 0; col < width - shape[1] + 1; col += widthStep) {
-          if (['x','X'].includes(cakeArray[row][col])) continue;
-          if (canPlace(col, row, shape, cakeArray, triedPlacements)) {
-            let raisinsUsed = placeShape(col, row, shape, cakeArray);
-            // print(cakeArray)
-            if (raisinsUsed === 1) {
-              usedShapes.push({left: col, top: row, shape: shape});
-              totalRaisinsUsed += 1;
-              if (usedShapes.length === width * height / (shapes[0][0] * shapes[0][1])) {
-                // Done!!!
-                return usedShapes;
-              }
-              let deeper = fn(cakeArray, usedShapes, totalRaisinsUsed, triedPlacements);
-              if (deeper) return deeper;
-              // Nothing has been found
-              usedShapes.pop();
-              totalRaisinsUsed -= 1;
-            }
-            removeShape(col, row, shape, cakeArray);
-            // print(cakeArray)
-            triedPlacements[[row,col,shape].toString()] = true;
+      // console.log('shape:', shape)
+      if (['x','X'].includes(cakeArray[row][col])) continue;
+      if (canPlace(col, row, shape, cakeArray)) {
+        let raisinsUsed = placeShape(col, row, shape, cakeArray);
+        // console.log(shape);
+        // print(cakeArray);
+        if (raisinsUsed === 1) {
+          usedShapes.push({left: col, top: row, shape: shape});
+          totalRaisinsUsed += 1;
+          if (usedShapes.length === width * height / (shapes[0][0] * shapes[0][1])) {
+            // Done!!!
+            return usedShapes;
           }
+          // find the nextCorner,
+          let nextCorner = null;
+          for (let j = 0; j < width; j++) {
+            for (let i = 0; i < height; i++) {
+              if(['.', 'o'].includes(cakeArray[i][j])) {
+                nextCorner = [i, j];
+                break;
+              }
+            }
+            if (nextCorner) break;
+          }
+          let deeper = fn(cakeArray, usedShapes, totalRaisinsUsed, nextCorner);
+          if (deeper) return deeper;
+          // Nothing has been found
+          usedShapes.pop();
+          totalRaisinsUsed -= 1;
         }
+        removeShape(col, row, shape, cakeArray);
       }
     }
     return false;
   }
 
-  usedShapes = fn(cakeArray, usedShapes, totalRaisinsUsed, triedPlacements);
+  usedShapes = fn(cakeArray, usedShapes, totalRaisinsUsed, nextCorner);
   return formatAnswer(cake, cakeArray, usedShapes || []);
-}
-
-function gcd2(a,b) { return (!b)?a:gcd2(b,a%b); };
-function gcd(nums) {
-	var factor = nums[0];
-	for(var i=1;i<nums.length;i++){
-	  factor = gcd2(factor,nums[i]);
-	}
-	return factor;
 }
 
 function formatAnswer(cake, cakeArray, usedShapes) {
@@ -113,8 +110,7 @@ function findShapes(height, width, area) {
   return shapes;
 }
 
-function canPlace(left, top, shape, cakeArray, triedPlacements) {
-  if(triedPlacements[[left,top,shape].toString()]) return false;
+function canPlace(left, top, shape, cakeArray) {
   if (top + shape[0] > cakeArray.length) return false;
   if (left + shape[1] > cakeArray[0].length) return false;
   let count = 0;
@@ -160,24 +156,24 @@ function removeShape(left, top, shape, cakeArray) {
 }
 
 var cake =
-`.o............
-..............
-.o........o...
-..............
-o.........o...
-..........o...
-..............
-..o.......o...
-..........o...
-..............
-...o......o...`
-// `...........................o..............
-// ..........................................
-// .o........................................
-// .....o....................................
-// .......................................o..
-// ..............o...........................
-// ........................o.................
-// .........o................................`
+// `.o............
+// ..............
+// .o........o...
+// ..............
+// o.........o...
+// ..........o...
+// ..............
+// ..o.......o...
+// ..........o...
+// ..............
+// ...o......o...`
+`...........................o..............
+..........................................
+.o........................................
+.....o....................................
+.......................................o..
+..............o...........................
+........................o.................
+.........o................................`
 
 console.log(cut(cake));
