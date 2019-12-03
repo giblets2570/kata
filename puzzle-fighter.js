@@ -1,7 +1,7 @@
 //need help with debugging?
 //uncomment the line below to see the game state for each Gem pair
 seeStates = true;
-let logging = false;
+let logging = true;
 function puzzleFighter(arr){
   console.log(arr);
 	//your code goes here. you can do it!
@@ -157,6 +157,7 @@ function findPowerGems(gs) {
       colorGems[color] = possibleGems;
     }
   }
+  console.log(colorGems)
   return colorGems;
 }
 
@@ -438,16 +439,28 @@ function updateBoard(gs, newPos, board='blank') {
 }
 
 let tests = [
-  [ [ 'RR', 'L' ],
-  [ 'RR', 'LR' ],
-  [ 'RR', 'LA' ],
-  [ 'RR', 'LA' ],
-  [ 'GG', 'LRR' ],
-  [ 'RR', 'LRR' ],
-  [ 'Gg', 'LRRR' ],
-  [ 'YB', 'LLRLRR' ],
-  [ 'YR', 'BBLR' ],
-  [ 'GB', 'ALRRRL' ] ]
+  [ [ 'BB', 'LLLL' ],
+  [ 'BB', 'LL' ],
+  [ 'BB', 'L' ],
+  [ 'BB', 'LLL' ],
+  [ 'BB', 'LL' ],
+  [ 'BG', 'L' ],
+  [ 'BB', '' ],
+  [ 'BB', 'R' ],
+  [ 'RB', 'BBRRR' ],
+  [ 'RR', 'LLL' ],
+  [ 'RR', 'BALL' ],
+  [ 'RR', '' ],
+  [ 'RR', 'R' ],
+  [ 'RR', 'L' ],
+  [ 'RR', 'B' ],
+  [ 'RR', 'LLL' ],
+  [ 'RR', 'LL' ],
+  [ 'RR', 'BLLL' ],
+  [ 'RR', 'B' ],
+  [ 'YR', 'ALL' ],
+  [ 'GR', 'AL' ],
+  [ 'Rb', 'RRRR' ] ]
 ]
 
 for (let test of tests) {
