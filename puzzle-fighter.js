@@ -9,7 +9,12 @@ function puzzleFighter(arr){
     board: Array(12).fill().map(() => Array(6).fill(' ')),
     blank: Array(12).fill().map(() => Array(6).fill(' ')),
     pair: null,
-    gems: {},
+    gems: {
+      B: [],
+      G: [],
+      R: [],
+      Y: [],
+    },
   };
   let pairIndex = 0;
   for (let [pair, moves] of arr) {
@@ -71,7 +76,7 @@ function testPowerGems() {
     pair: null
   };
   findPowerGems(gameState);
-  // console.log(gameState.gems)
+  console.log(gameState.gems)
 }
 
 function contains(bigger, smaller) {
@@ -119,8 +124,6 @@ function contains(bigger, smaller) {
   }
 }
 
-
-
 function findPowerGems(gs) {
   let colors = Array.from(gs.board.reduce((c, row) => {
     for (let ele of row) {
@@ -131,189 +134,48 @@ function findPowerGems(gs) {
     return c;
   }, new Set()));
   for (let color of colors) {
-    // first find all lines
-    let lines = [];
-    for (let col = 0; col < 6; col++) {
+    // get horizontal lines
+    let lines = []
+    for (let row = 0; row < 12; row++) {
       lines.push([]);
-      // let current = -1;
-      for (let r1 = 0; r1 < 12; r1++) {
-        if (gs.board[r1][col] !== color) continue;
-        let r2;
-        for (r2 = r1 + 1; r2 <= 12; r2++){
-          if (r2 - r1 > 1) lines[col].push([r1, r2]);
-          if (!gs.board[r2] || gs.board[r2][col] !== color) break;
+      for (let colStart = 0; colStart < 6; colStart++) {
+        if (gs.board[row][colStart] !== color) continue;
+        for (let colEnd = colStart+1; colEnd < 6; colEnd++) {
+          if (gs.board[row][colEnd] !== color) break;
+          if (colEnd - colStart >= 1) lines[row].push([colStart, colEnd+1]);
         }
       }
     }
-    // now find all possible power gems for those lines
-    // if (logging) console.log(lines)
-    let possibleGems = [];
-
-    for (let i = 0; i < lines.length; i++) {
-      if (!lines[i].length) continue;
-      for (let li = 0; li < lines[i].length; li++) {
-        let [min, max] = lines[i][li];
-        let j;
-        for (j = i + 1; j < lines.length; j++) {
-          let line = lines[j].find((l) => l[0] === min && l[1] === max);
-          if (!line) break;
-        }
-        let width = j - i;
-        if (width > 1) {
-          possibleGems.push([min, i, max - min, width]); // row, col, height, width
-        }
-      }
-    }
-    if (logging) console.log(possibleGems)
-    // Sort the gems in terms of height, then by volume
-    possibleGems = possibleGems.sort((a, b) => {
-      if (a[0] < b[0]) return -1;
-      if (a[0] === b[0]) {
-        if (a[2] * a[3] <= b[2] * b[3]) return 1;
-        return -1;
-      }
-      return 1;
-    });
-    // Filter out the ones that overlap the old gems
-    for (let i = (gs.gems[color]||[]).length-1; i >= 0; i--) {
-      for (let j = possibleGems.length-1; j >= 0; j--) {
-        let [row1, col1, height1, width1] = gs.gems[color][i];
-        let [row2, col2, height2, width2] = possibleGems[j];
-        if (row1 === row2 && col1 === col2 && height1 === height2 && width1 === width2) {
-          possibleGems.splice(j, 1);
-        } else if (
-          (
-            // row1 <= row2 < (row1 + height1)
-            row1 <= row2 && row2 < (row1 + height1) &&
-            col1 <= col2 && col2 < (col1 + width1)
-          ) || (
-            // row2 <= row1 < (row2 + height2)
-            row2 <= row1 && row1 < (row2 + height2) &&
-            col2 <= col1 && col1 < (col2 + width2)
-          )
-        ) {
-          // console.log('splicing:', possibleGems[j])
-          // check whether this new gem contains the old one
-          if (!contains(possibleGems[j], gs.gems[color][i])) {
-            possibleGems.splice(j, 1);
-          }
-        }
-      }
-    }
-    // Add in the ones that dont overlap any old gems
-    for (let j = possibleGems.length-1; j >= 0; j--) {
-      let overlapped = false;
-      for (let i = (gs.gems[color]||[]).length-1; i >= 0; i--) {
-        let [row1, col1, height1, width1] = gs.gems[color][i];
-        let [row2, col2, height2, width2] = possibleGems[j];
-        if (row1 === row2 && col1 === col2 && height1 === height2 && width1 === width2) {
-          possibleGems.splice(j, 1);
-        } else if (
-          (
-            // row1 <= row2 < (row1 + height1)
-            row1 <= row2 && row2 < (row1 + height1) &&
-            col1 <= col2 && col2 < (col1 + width1)
-          ) || (
-            // row2 <= row1 < (row2 + height2)
-            row2 <= row1 && row1 < (row2 + height2) &&
-            col2 <= col1 && col1 < (col2 + width2)
-          )
-        ) {
-          // console.log('splicing:', possibleGems[j])
-          // check whether this new gem contains the old one
-          overlapped = true;
-        }
-      }
-      if (!overlapped) {
-        gs.gems[color].push(possibleGems[j]);
-        possibleGems.splice(j, 1);
-      }
-    }
-    // if (logging) console.log(`possibleGems[${color}]:`, possibleGems)
-    // Now remove the old ones that are overlapped by the new ones
-    for (let i = (gs.gems[color]||[]).length-1; i >= 0; i--) {
-      for (let j = possibleGems.length-1; j >= 0; j--) {
-        let [row1, col1, height1, width1] = gs.gems[color][i];
-        let [row2, col2, height2, width2] = possibleGems[j];
-        if (
-          (
-            // row1 <= row2 < (row1 + height1)
-            row1 <= row2 && row2 < (row1 + height1) &&
-            col1 <= col2 && col2 < (col1 + width1)
-          ) || (
-            // row2 <= row1 < (row2 + height2)
-            row2 <= row1 && row1 < (row2 + height2) &&
-            col2 <= col1 && col1 < (col2 + width2)
-          )
-        ) {
-          // console.log('splicing:', possibleGems[j])
-          // check whether this new gem contains the old one
-          if (contains(possibleGems[j], gs.gems[color][i])) {
-            gs.gems[color].splice(i, 1, possibleGems[j]);
-            possibleGems.splice(j, 1);
+    // Join horizontal lines
+    let gems = [];
+    for (let rowStart = 0; rowStart < 12; rowStart++) {
+      for (let line of lines[rowStart]) {
+        let currentHeight = 1;
+        for (let rowEnd = rowStart+1; rowEnd < 12; rowEnd++) {
+          if (!lines[rowEnd].find((l) => l[0] === line[0] && l[1] === line[1])) {
             break;
           }
+          currentHeight += 1;
+          if (currentHeight > 1) {
+            // row, col, height, width
+            gems.push([rowStart, line[0], currentHeight, line[1] - line[0]]);
+          }
         }
       }
     }
+    // Any gems that dont overlap the current gems, add to the current gems
+    let rGems = gems.slice().reverse();
+    for (let i = rGems.length - 1; i >= 0; i--) {
+      let overlap = false;
+      for(let gem of gs.gems[color]) {
 
-    for (let i = (gs.gems[color]||[]).length-1; i >= 0; i--) {
-      for (let j = possibleGems.length-1; j >= 0; j--) {
-        let [row1, col1, height1, width1] = gs.gems[color][i];
-        let [row2, col2, height2, width2] = possibleGems[j];
-        if (
-          (
-            // row1 <= row2 < (row1 + height1)
-            row1 <= row2 && row2 < (row1 + height1) &&
-            col1 <= col2 && col2 < (col1 + width1)
-          ) || (
-            // row2 <= row1 < (row2 + height2)
-            row2 <= row1 && row1 < (row2 + height2) &&
-            col2 <= col1 && col1 < (col2 + width2)
-          )
-        ) {
-          possibleGems.splice(j, 1);
-        }
       }
-    }
-
-    // if (logging) console.log(`gs.gems[${color}]:`, gs.gems[color])
-    // if (logging) console.log('possibleGems:', possibleGems)
-    for (let i = 0; i < possibleGems.length; i++) {
-      for (let j = possibleGems.length-1; j > i; j--) {
-        // two gems overlap if
-        let [row1, col1, height1, width1] = possibleGems[i];
-        let [row2, col2, height2, width2] = possibleGems[j]
-        if (row1 === row2 && col1 === col2 && height1 === height2 && width1 === width2) {
-          possibleGems.splice(j, 1);
-        } else if (
-          (
-            row1 <= row2 && row2 < (row1 + height1) &&
-            col1 <= col2 && col2 < (col1 + width1)
-          ) || (
-            row2 <= row1 && row1 < (row2 + height2) &&
-            col2 <= col1 && col1 < (col2 + width2)
-          )
-        ) {
-          possibleGems.splice(j, 1);
-        }
-      }
-    }
-    // if (logging) console.log(possibleGems)
-    if (!gs.gems[color]) gs.gems[color] = [];
-    for(let gem of possibleGems) {
-      gs.gems[color].push(gem);
-    }
-    gs.gems[color] = gs.gems[color].sort((a, b) => b[0] - a[0])
-    // Find if merging happenned
-    for (var i = 0; i < gs.gems[color].length; i++) {
-      for (var j = gs.gems[color].length - 1; j > i; j--) {
-        if (contains(gs.gems[color][i], gs.gems[color][j])) {
-          gs.gems[color].splice(j, 1);
-        }
+      if (!overlap) {
+        gs.gems[color].push(rGems.splice(i, 1)[0]);
       }
     }
   }
+  return {};
 }
 
 function makeMove(gs, move) {
@@ -623,15 +485,3 @@ for (let test of tests) {
   let result = puzzleFighter(test);
   // console.log(result.split('\n').map((r) => '|' + r + '|').join('\n'))
 }
-// [row, col, height, width]
-// console.log([ 3, 0, 3, 2 ], [ 4, 0, 2, 2 ])
-// console.log(contains([ 3, 0, 3, 2 ], [ 4, 0, 2, 2 ]))
-//
-// console.log([ 4, 0, 2, 3 ], [ 4, 1, 2, 2 ])
-// console.log(contains([ 4, 0, 2, 3 ], [ 4, 1, 2, 2 ]))
-//
-// console.log([ 3, 0, 3, 3 ], [ 4, 1, 2, 2 ])
-// console.log(contains([ 3, 0, 3, 3 ], [ 4, 1, 2, 2 ]))
-//
-// console.log([ 3, 0, 3, 3 ], [ 4, 1, 2, 3 ])
-// console.log(contains([ 3, 0, 3, 3 ], [ 4, 1, 2, 3 ]))
