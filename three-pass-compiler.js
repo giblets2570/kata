@@ -1,0 +1,327 @@
+let util = require('util');
+
+function Compiler () {};
+
+Compiler.prototype.compile = function (program) {
+  return this.pass3(this.pass2(this.pass1(program)));
+};
+
+Compiler.prototype.tokenize = function (program) {
+  // Turn a program string into an array of tokens.  Each token
+  // is either '[', ']', '(', ')', '+', '-', '*', '/', a variable
+  // name or a number (as a string)
+  var regex = /\s*([-+*/\(\)\[\]]|[A-Za-z]+|[0-9]+)\s*/g;
+  return program.replace(regex, ":$1").substring(1).split(':').map( function (tok) {
+    return isNaN(tok) ? tok : tok|0;
+  });
+};
+
+Compiler.prototype.pass1recr = function (vars, expression) {
+  if (expression.includes('(')) {
+    let start = expression.indexOf('(');
+    let level = 0;
+    let i;
+    for(i = start + 1; i < expression.length; i++) {
+      if (expression[i] === '(') {
+        level += 1;
+        continue;
+      }
+      if (expression[i] === ')') {
+        if (level > 0) {
+          level -= 1;
+        } else {
+          break;
+        }
+      }
+    }
+    let inner = expression.slice(start+1, i);
+    let result = this.pass1recr(vars, inner);
+    if (result.length !== 1) throw new Error('Not correct length');
+    expression.splice(start, i-start+1, result[0]);
+    return this.pass1recr(vars, expression);;
+  } else {
+    let i = 1;
+    while(i < expression.length) {
+//       console.log(JSON.stringify(expression), i);
+      if(['*','/'].includes(expression[i])) {
+        let [a, op, b] = expression.slice(i-1, i+2);
+        let tree = {op: op};
+        if (parseInt(a) > -1) {
+          tree.a = { op: 'imm', n: parseInt(a), }
+        } else if (typeof a === 'object') {
+          tree.a = a
+        } else {
+          if (!vars.includes(a)) throw new Error("Not a valid");
+          tree.a = { op: 'arg', n: vars.indexOf(a), }
+        }
+        if (parseInt(b) > -1) {
+          tree.b = { op: 'imm', n: parseInt(b), }
+        } else if (typeof b === 'object') {
+          tree.b = b
+        } else {
+          if (!vars.includes(b)) throw new Error("Not a valid");
+          tree.b = { op: 'arg', n: vars.indexOf(b), }
+        }
+//         console.log(expression.slice(i-1, i+2).length);
+
+        expression.splice(i-1, 3, tree);
+      } else {
+        i += 2;
+      }
+    }
+//     console.log(JSON.stringify(expression));
+    i = 1;
+    while(i < expression.length) {
+      if(['+','-'].includes(expression[i])) {
+        let [a, op, b] = expression.slice(i-1, i+2);
+        let tree = {op: op};
+        if (parseInt(a) > -1) {
+          tree.a = { op: 'imm', n: parseInt(a), }
+        } else if (typeof a === 'object') {
+          tree.a = a
+        } else {
+          if (!vars.includes(a)) throw new Error("Not a valid");
+          tree.a = { op: 'arg', n: vars.indexOf(a), }
+        }
+        if (parseInt(b) > -1) {
+          tree.b = { op: 'imm', n: parseInt(b), }
+        } else if (typeof b === 'object') {
+          tree.b = b
+        } else {
+          if (!vars.includes(b)) throw new Error("Not a valid");
+          tree.b = { op: 'arg', n: vars.indexOf(b), }
+        }
+        expression.splice(i-1, 3, tree);
+      } else {
+        i += 2;
+      }
+    }
+    return expression;
+  }
+}
+
+Compiler.prototype.pass1 = function (program) {
+  // return un-optimized AST
+  let tokens = this.tokenize(program);
+
+  let varEnd = tokens.indexOf(']');
+  let vars = tokens.slice(1, varEnd);
+  let expression = tokens.slice(varEnd+1);
+
+  let result = this.pass1recr(vars, expression);
+  if (result.length !== 1) throw new Error('Not correct length');
+  return result[0];
+};
+
+Compiler.prototype.pass2 = function (ast) {
+  // return AST with constant expressions reduced
+  if (ast.a.n !== undefined && ast.b.n !== undefined) {
+    if (ast.a.op === 'imm' && ast.b.op === 'imm') {
+      let newObj = { op: 'imm' };
+      switch (ast.op) {
+        case '*': {
+          newObj.n = ast.a.n * ast.b.n;
+          break;
+        }
+        case '/': {
+          newObj.n = ast.a.n / ast.b.n;
+          break;
+        }
+        case '+': {
+          newObj.n = ast.a.n + ast.b.n;
+          break;
+        }
+        case '-': {
+          newObj.n = ast.a.n - ast.b.n;
+          break;
+        }
+      }
+      return newObj;
+    } else {
+      return ast;
+    }
+  } else {
+    if (ast.a && ast.a.n === undefined) {
+      ast.a = this.pass2(ast.a);
+    }
+    if (ast.b && ast.b.n === undefined) {
+      ast.b = this.pass2(ast.b);
+    }
+    if (ast.a && ast.b) {
+      if (ast.a.op === 'imm' && ast.b.op === 'imm') {
+        ast = this.pass2(ast);
+      }
+    }
+    return ast;
+  }
+};
+
+Compiler.prototype.pass3recr = function (ast, result, registers, stack) {
+  // return assembly instructions
+  // not the lowest level
+
+  switch(ast.op) {
+    case '*': {
+      if (ast.b.a) {
+        result.push('PU');
+        result = this.pass3recr(ast.b, result);
+        result.push('PO');
+        result.push('SW');
+        result.push('PO');
+      } else {
+        if (ast.b.op === 'imm') {
+          result.push(`IM ${ast.b.n}`)
+        } else {
+          result.push(`AR ${ast.b.n}`)
+        }
+      }
+      result.push('SW');
+      if (ast.a.a) {
+        result.push('PU');
+        result = this.pass3recr(ast.a, result);
+        result.push('PO');
+        result.push('SW');
+        result.push('PO');
+      } else {
+        if (ast.a.op === 'imm') {
+          result.push(`IM ${ast.a.n}`);
+        } else {
+          result.push(`AR ${ast.a.n}`);
+        }
+      }
+      result.push('MU');
+      result.push('PU');
+      break;
+    }
+    case '/': {
+      if (ast.b.a) {
+        result.push('PU');
+        result = this.pass3recr(ast.b, result);
+        result.push('PO');
+        result.push('SW');
+        result.push('PO');
+      } else {
+        if (ast.b.op === 'imm') {
+          result.push(`IM ${ast.b.n}`)
+        } else {
+          result.push(`AR ${ast.b.n}`)
+        }
+      }
+      result.push('SW');
+      if (ast.a.a) {
+        result.push('PU');
+        result = this.pass3recr(ast.a, result);
+        result.push('PO');
+        result.push('SW');
+        result.push('PO');
+      } else {
+        if (ast.a.op === 'imm') {
+          result.push(`IM ${ast.a.n}`);
+        } else {
+          result.push(`AR ${ast.a.n}`);
+        }
+      }
+      result.push('DI');
+      result.push('PU');
+      break;
+    }
+    case '+': {
+      if (ast.b.a) {
+        result.push('PU');
+        result = this.pass3recr(ast.b, result);
+        result.push('PO');
+        result.push('SW');
+        result.push('PO');
+      } else {
+        if (ast.b.op === 'imm') {
+          result.push(`IM ${ast.b.n}`)
+        } else {
+          result.push(`AR ${ast.b.n}`)
+        }
+      }
+      result.push('SW');
+      if (ast.a.a) {
+        result.push('PU');
+        result = this.pass3recr(ast.a, result);
+        result.push('PO');
+        result.push('SW');
+        result.push('PO');
+      } else {
+        if (ast.a.op === 'imm') {
+          result.push(`IM ${ast.a.n}`);
+        } else {
+          result.push(`AR ${ast.a.n}`);
+        }
+      }
+      result.push('AD');
+      result.push('PU');
+      break;
+    }
+    case '-': {
+      if (ast.b.a) {
+        result.push('PU');
+        result = this.pass3recr(ast.b, result);
+        result.push('PO');
+        result.push('SW');
+        result.push('PO');
+      } else {
+        if (ast.b.op === 'imm') {
+          result.push(`IM ${ast.b.n}`)
+        } else {
+          result.push(`AR ${ast.b.n}`)
+        }
+      }
+      result.push('SW');
+      if (ast.a.a) {
+        result.push('PU');
+        result = this.pass3recr(ast.a, result);
+        result.push('PO');
+        result.push('SW');
+        result.push('PO');
+      } else {
+        if (ast.a.op === 'imm') {
+          result.push(`IM ${ast.a.n}`);
+        } else {
+          result.push(`AR ${ast.a.n}`);
+        }
+      }
+      result.push('SU');
+      result.push('PU');
+      break;
+    }
+    default: break;
+  }
+  // result.push('PU');
+  // result.push('PO');
+  return result;
+}
+
+Compiler.prototype.pass3 = function (ast) {
+
+  let registers = [null, null];
+  let stack = [];
+  let result = this.pass3recr(ast, [], registers, stack);
+  result.push('PO');
+  return result;
+};
+
+
+var prog = '[ x y z ] ( 2*3*x + 5*y - 3*z ) / (1 + 3 + 2*2)';
+// var prog = '[ x ] ( x + 2*5 )'
+// var prog = '[ x ] ( x + 2*5 ) / ( 4 + x )'
+// var t1 = JSON.stringify({"op":"/","a":{"op":"-","a":{"op":"+","a":{"op":"*","a":{"op":"*","a":{"op":"imm","n":2},"b":{"op":"imm","n":3}},"b":{"op":"arg","n":0}},"b":{"op":"*","a":{"op":"imm","n":5},"b":{"op":"arg","n":1}}},"b":{"op":"*","a":{"op":"imm","n":3},"b":{"op":"arg","n":2}}},"b":{"op":"+","a":{"op":"+","a":{"op":"imm","n":1},"b":{"op":"imm","n":3}},"b":{"op":"*","a":{"op":"imm","n":2},"b":{"op":"imm","n":2}}}});
+// var t2 = JSON.stringify({"op":"/","a":{"op":"-","a":{"op":"+","a":{"op":"*","a":{"op":"imm","n":6},"b":{"op":"arg","n":0}},"b":{"op":"*","a":{"op":"imm","n":5},"b":{"op":"arg","n":1}}},"b":{"op":"*","a":{"op":"imm","n":3},"b":{"op":"arg","n":2}}},"b":{"op":"imm","n":8}});
+
+var c = new Compiler();
+// Test.expect(c,"Able to construct compiler");
+
+console.log(prog);
+
+var p1 = c.pass1(prog);
+var p2 = c.pass2(p1);
+
+console.log(p2);
+
+var p3 = c.pass3(p2);
+
+console.log(JSON.stringify(p3));

@@ -18,6 +18,8 @@ function puzzleFighter(arr){
   };
   let pairIndex = 0;
   for (let [pair, moves] of arr) {
+    if (logging) console.log('\n')
+    if (logging) console.log(`PAIR ${pairIndex}: ${pair} | MOVE: ${moves}`)
     pairIndex += 1;
     addPair(gameState, pair);
 
@@ -25,58 +27,63 @@ function puzzleFighter(arr){
       // console.log(gameState.pair)
       makeMove(gameState, move);
     });
+    // move newpos to top of board
+    while (Math.min(gameState.pair.newPos[0][0], gameState.pair.newPos[1][0])) {
+      gameState.pair.newPos[0][0] -= 1;
+      gameState.pair.newPos[1][0] -= 1;
+    }
     try {
       checkNewPos(gameState, gameState.pair.newPos, 'board');
     } catch (e) {
+      console.log(gameState.pair.newPos)
       break;
     }
-
+    // console.log('old board')
+    // printState(gameState)
     updateBoard(gameState, gameState.pair.newPos, 'board');
+    // console.log('new board')
+    // printState(gameState)
     // remove pair
     gameState.blank = Array(12).fill().map(() => Array(6).fill(' '));
     gameState.pair = null;
-    let checker = 0;
     while(true) {
       let dropped = drop(gameState);
-      // check for collisions
       // console.log(`gameState.gems:`, gameState.gems)
-      findPowerGems(gameState);
       let collisions = checkForCollisions(gameState);
+      let lastCollision;
       for (let collision of collisions) {
-        applyCollision(gameState, collision);
+        lastCollision = applyCollision(gameState, collision);
+      }
+      // if (collisions.length) continue;
+      // check for collisions
+      // console.log(lastCollision, gameState.gems)
+      // printState(gameState)
+      if (lastCollision === '0') {
+        // seems like there is a glitch here
+        let oldState = gameState.board.slice();
+        drop(gameState);
+        let moreCollisions = checkForCollisions(gameState);
+        if (!moreCollisions.length) {
+          gameState.board = oldState;
+          findPowerGems(gameState);
+        } else {
+          for (let collision of moreCollisions) {
+            lastCollision = applyCollision(gameState, collision);
+          }
+          printState(gameState)
+        }
+      } else {
+        findPowerGems(gameState);
       }
       // console.log(`gameState.gems2:`, gameState.gems)
-      if (!dropped) break;
+      if (!dropped && !collisions.length) break;
     }
-    if (logging) console.log('\n')
-    if (logging) console.log(`PAIR ${pairIndex}: ${pair} | MOVE: ${moves}`)
+    // findPowerGems(gameState);
     if (logging) console.log(gameState.gems)
     if (logging) printState(gameState);
   }
   // printState(gameState);
   return gameState.board.map((row) => row.join('')).join('\n');
-}
-
-function testPowerGems() {
-  let gameState = {
-    board: [
-      [' ',' ',' ',' ',' ',' '],
-      [' ',' ',' ',' ',' ',' '],
-      [' ',' ',' ',' ',' ',' '],
-      [' ',' ',' ',' ',' ',' '],
-      [' ',' ',' ',' ',' ',' '],
-      [' ',' ',' ',' ',' ',' '],
-      [' ',' ',' ',' ',' ',' '],
-      [' ',' ',' ',' ',' ',' '],
-      [' ',' ',' ',' ',' ',' '],
-      [' ','R','R',' ',' ',' '],
-      [' ','R','R','R',' ',' '],
-      ['B','B','R','R',' ',' '],
-    ],
-    pair: null
-  };
-  findPowerGems(gameState);
-  console.log(gameState.gems)
 }
 
 function contains(bigger, smaller) {
@@ -127,8 +134,8 @@ function contains(bigger, smaller) {
 function findPowerGems(gs) {
   let colors = Array.from(gs.board.reduce((c, row) => {
     for (let ele of row) {
-      if (ele !== ' ') {
-        c.add(ele);
+      if (ele !== ' ' && ele !== '0') {
+        c.add(ele.toUpperCase());
       }
     }
     return c;
@@ -168,14 +175,118 @@ function findPowerGems(gs) {
     for (let i = rGems.length - 1; i >= 0; i--) {
       let overlap = false;
       for(let gem of gs.gems[color]) {
-
+        if (doOverlap(rGems[i], gem)) {
+          overlap = true;
+          break;
+        }
       }
       if (!overlap) {
         gs.gems[color].push(rGems.splice(i, 1)[0]);
       }
     }
+    // Any gems that contain the current gems, and doesnt overlap another current gem, replace
+    for (let i = rGems.length - 1; i >= 0; i--) {
+      for (let j = 0; j < gs.gems[color].length; j++) {
+        if (contains(rGems[i], gs.gems[color][j])) {
+          let overlap = false;
+          for (let k = 0; k < gs.gems[color].length; k++) {
+            if (k === j) continue;
+            if (doOverlap(rGems[i], gs.gems[color][k])) {
+              overlap = true;
+              break;
+            }
+          }
+          if (!overlap) {
+            gs.gems[color].splice(j, 1, rGems.splice(i, 1)[0]);
+          }
+        }
+      }
+    }
+    while(combineGems(gs, color)) {
+      // console.log('is combine')
+    }
   }
-  return {};
+}
+
+function combineGems(gs, color) {
+  // find all the gems with the same col
+  // if they have the same width, then if the row1 + height1 === row2,
+  // They can be combined as [row1, col, height1 + height2, width]
+  // find all the gems with the same row
+  // if they have the same height, then if the col1 + width1 === col2,
+  // They can be combined as [row1, col, height1, width1 + width2]
+  for (let i = 0; i < gs.gems[color].length; i++) {
+    for (let j = i + 1; j < gs.gems[color].length; j++) {
+      if (
+        gs.gems[color][i][1] === gs.gems[color][j][1] &&
+        gs.gems[color][i][3] === gs.gems[color][j][3]
+      ) {
+        let gem1;
+        let gem2;
+        if (gs.gems[color][i][0] < gs.gems[color][j][0]) {
+          gem1 = gs.gems[color][i];
+          gem2 = gs.gems[color][j];
+        } else {
+          gem1 = gs.gems[color][j];
+          gem2 = gs.gems[color][i];
+        }
+        let [row1, col1, height1, width1] = gem1;
+        // console.log([row1, col1, height1, width1]);
+        let [row2, col2, height2, width2] = gem2;
+        // console.log([row2, col2, height2, width2]);
+        if (row1 + height1 === row2) {
+          let newGem = [row1, col1, height1 + height2, width1];
+          gs.gems[color].splice(j, 1);
+          gs.gems[color].splice(i, 1, newGem);
+          return true;
+        }
+      }
+      if (
+        gs.gems[color][i][0] === gs.gems[color][j][0] &&
+        gs.gems[color][i][2] === gs.gems[color][j][2]
+      ) {
+        let gem1;
+        let gem2;
+        if (gs.gems[color][i][1] < gs.gems[color][j][1]) {
+          gem1 = gs.gems[color][i];
+          gem2 = gs.gems[color][j];
+        } else {
+          gem1 = gs.gems[color][j];
+          gem2 = gs.gems[color][i];
+        }
+        let [row1, col1, height1, width1] = gem1;
+        let [row2, col2, height2, width2] = gem2
+        if (col1 + width1 === col2) {
+          let newGem = [row1, col1, height1, width1 + width2];
+          gs.gems[color].splice(j, 1);
+          gs.gems[color].splice(i, 1, newGem);
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+
+function doOverlap(gem1, gem2) {
+  // two gems overlap if
+  let [row1, col1, height1, width1] = gem1;
+  let [row2, col2, height2, width2] = gem2
+  return (
+    (
+      row1 <= row2 && row2 < (row1 + height1) &&
+      col1 <= col2 && col2 < (col1 + width1)
+    ) || (
+      row2 <= row1 && row1 < (row2 + height2) &&
+      col2 <= col1 && col1 < (col2 + width2)
+    ) || (
+      row1 <= row2 && row2 < (row1 + height1) &&
+      col2 <= col1 && col1 < (col2 + width2)
+    ) || (
+      row2 <= row1 && row1 < (row2 + height2) &&
+      col1 <= col2 && col2 < (col1 + width1)
+    )
+  )
 }
 
 function makeMove(gs, move) {
@@ -198,8 +309,6 @@ function makeMove(gs, move) {
 }
 
 function printState(gs) {
-  // console.log(util.inspect(gs, { showHidden: true, depth: null, colors: true }));
-  // console.log(gs.board);
   console.log(gs.board.map((row) => '|'+row.join('')+'|').join('\n'));
 }
 
@@ -225,10 +334,10 @@ function checkForCollisions(gs) {
         // Check if there are any touching
         let color = gs.board[i][j].toUpperCase();
         if (
-          (i > 0 && gs.board[i-1][j] === color) ||
-          (i < 11 && gs.board[i+1][j] === color) ||
-          (j > 0 && gs.board[i][j-1] === color) ||
-          (j < 5 && gs.board[i][j+1] === color)
+          (i > 0 && gs.board[i-1][j].toUpperCase() === color) ||
+          (i < 11 && gs.board[i+1][j].toUpperCase() === color) ||
+          (j > 0 && gs.board[i][j-1].toUpperCase() === color) ||
+          (j < 5 && gs.board[i][j+1].toUpperCase() === color)
         ) {
           collisions.push([i, j]);
         }
@@ -248,49 +357,72 @@ function applyCollision(gs, collision) {
     let [i, j] = toCheck.shift();
     if (i !== 11) {
       // it is not on the floor
-      let color = gs.board[i+1][j];
-      for (let row = 0; row < 12; row++) {
-        for (var col = 0; col < 6; col++) {
-          if (gs.board[row][col].toUpperCase() === color) {
-            toRemove.push([row, col]);
+      let color = gs.board[i+1][j].toUpperCase();
+      gs.gems[color] = [];
+      if (['R','Y','G','B'].includes(color)) {
+        for (let row = 0; row < 12; row++) {
+          for (var col = 0; col < 6; col++) {
+            if (gs.board[row][col].toUpperCase() === color) {
+              toRemove.push([row, col]);
+            }
           }
         }
       }
     }
   } else {
     let color = collider.toUpperCase();
+
     while (toCheck.length) {
       let [i, j] = toCheck.shift();
       checked.push([i, j]);
-      if (i > 0 && gs.board[i-1][j] === color) {
+      if (i > 0 && gs.board[i-1][j].toUpperCase() === color) {
         if(!checked.find(t => t[0] === i-1 && t[1] === j)) {
           toRemove.push([i-1, j]);
           toCheck.push([i-1, j]);
         }
       }
-      if(i < 11 && gs.board[i+1][j] === color) {
+      if(i < 11 && gs.board[i+1][j].toUpperCase() === color) {
         if(!checked.find(t => t[0] === i+1 && t[1] === j)) {
           toRemove.push([i+1, j]);
           toCheck.push([i+1, j]);
         }
       }
-      if(j > 0 && gs.board[i][j-1] === color) {
+      if(j > 0 && gs.board[i][j-1].toUpperCase() === color) {
         if(!checked.find(t => t[0] === i && t[1] === j-1)) {
           toRemove.push([i, j-1]);
           toCheck.push([i, j-1]);
         }
       }
-      if(j < 5 && gs.board[i][j+1] === color) {
+      if(j < 5 && gs.board[i][j+1].toUpperCase() === color) {
         if(!checked.find(t => t[0] === i && t[1] === j+1)) {
           toRemove.push([i, j+1]);
           toCheck.push([i, j+1]);
         }
       }
     }
+    // Remove any gems
+    if (gs.gems[color]) {
+      gs.gems[color] = gs.gems[color].filter(function(gem) {
+        // row, col, height, width
+        let [row, col, height, width] = gem;
+
+        for (let [i, j] of toRemove) {
+          // console.log([i, j])
+          if (i < row) return false;
+          if (i >= row + height) return false;
+          if (j < col) return false;
+          if (j >= col + width) return false;
+        }
+
+        return true;
+      });
+    }
   }
   for (let [i, j] of toRemove) {
+    // console.log([i, j])
     gs.board[i][j] = ' ';
   }
+  return collider;
 }
 
 function drop(gs) {
@@ -314,6 +446,8 @@ function drop(gs) {
               return true;
             });
             if (gem) {
+              // console.log('\n')
+              // printState(gs)
               // console.log(gem)
               let [row, col, height, width] = gem;
               let newRow = 11;
@@ -337,7 +471,19 @@ function drop(gs) {
                   gs.board[r][k] = color;
                 }
               }
-
+              // Need to update the state of the gem
+              gs.gems[color] = gs.gems[color].map((g) => {
+                if (
+                  g[0] === row &&
+                  g[1] === col &&
+                  g[2] === height &&
+                  g[3] === width
+                ) {
+                  g[0] = newRow;
+                  return g;
+                }
+                return g;
+              })
               continue;
             }
           }
@@ -449,39 +595,84 @@ function updateBoard(gs, newPos, board='blank') {
     gs.blank[gs.pair.newPos[0][0]][gs.pair.newPos[0][1]] = ' ';
     gs.blank[gs.pair.newPos[1][0]][gs.pair.newPos[1][1]] = ' ';
   } else {
-    gs.board[gs.pair.pos[0][0]][gs.pair.pos[0][1]] = ' ';
-    gs.board[gs.pair.pos[1][0]][gs.pair.pos[1][1]] = ' ';
+    // gs.board[gs.pair.pos[0][0]][gs.pair.pos[0][1]] = ' ';
+    // gs.board[gs.pair.pos[1][0]][gs.pair.pos[1][1]] = ' ';
   }
   gs[board][newPos[0][0]][newPos[0][1]] = gs.pair.str[0];
   gs[board][newPos[1][0]][newPos[1][1]] = gs.pair.str[1];
 }
 
 let tests = [
-  [ [ 'BB', 'LLLL' ],
-  [ 'BB', 'LL' ],
-  [ 'BB', 'L' ],
-  [ 'BB', 'LLL' ],
-  [ 'BB', 'LL' ],
-  [ 'BG', 'L' ],
+  [ [ 'BB', 'B' ],
+  [ 'YY', 'R' ],
+  [ 'RB', 'AALL' ],
+  [ 'YG', 'BBRR' ],
+  [ 'GR', 'AA' ],
+  [ 'YG', 'BBBRR' ],
+  [ 'YG', 'ALLL' ],
+  [ 'Bb', 'BBRRR' ],
+  [ 'RB', 'BBBLLL' ],
+  [ 'GG', 'BB' ],
+  [ 'YR', 'RR' ],
+  [ 'yb', 'R' ],
   [ 'BB', '' ],
-  [ 'BB', 'R' ],
-  [ 'RB', 'BBRRR' ],
-  [ 'RR', 'LLL' ],
-  [ 'RR', 'BALL' ],
-  [ 'RR', '' ],
-  [ 'RR', 'R' ],
+  [ 'YG', '' ],
+  [ 'YB', 'B' ],
+  [ 'YG', 'AAAL' ],
+  [ 'RG', 'BRRR' ],
+  [ 'G0', 'RRR' ],
+  [ 'BB', 'BBL' ],
+  [ 'Gb', 'BBRR' ],
+  [ 'RG', 'L' ],
+  [ 'BG', 'BBR' ],
+  [ 'BG', 'BL' ],
+  [ 'GR', 'AR' ],
+  [ 'BG', 'BBRRR' ],
+  [ 'bY', 'BBLL' ],
+  [ 'RG', 'A' ],
+  [ 'G0', 'LL' ],
+  [ 'GY', 'BBBLLL' ],
+  [ 'YR', 'BBB' ],
+  [ 'Gg', 'BLLL' ],
+  [ 'YB', '' ],
+  [ 'YG', 'RR' ],
+  [ 'BY', 'AAR' ],
+  [ 'RG', 'B' ],
+  [ 'YG', 'AAL' ],
+  [ 'RG', 'B' ],
+  [ 'GB', 'R' ],
+  [ 'YY', 'AAARR' ],
+  [ 'GG', 'BBBR' ],
+  [ 'YR', 'BR' ],
+  [ 'RY', 'RR' ],
+  [ 'BY', 'BBLL' ],
+  [ 'RY', 'A' ],
+  [ 'YG', 'AAA' ],
+  [ 'GB', 'AARR' ],
+  [ 'BB', 'BBL' ],
+  [ 'RG', 'RRR' ],
+  [ 'GG', 'AAARR' ],
+  [ 'RG', 'BBBL' ],
+  [ 'YR', 'AAA' ],
+  [ 'GB', 'ALLL' ],
+  [ 'GG', '' ],
   [ 'RR', 'L' ],
-  [ 'RR', 'B' ],
-  [ 'RR', 'LLL' ],
-  [ 'RR', 'LL' ],
-  [ 'RR', 'BLLL' ],
-  [ 'RR', 'B' ],
-  [ 'YR', 'ALL' ],
-  [ 'GR', 'AL' ],
-  [ 'Rb', 'RRRR' ] ]
+  [ 'RG', '' ],
+  [ 'BG', 'BBRR' ],
+  [ 'bY', 'LL' ],
+  [ 'RY', 'BB' ],
+  [ 'YY', 'AAAL' ],
+  [ 'GB', 'BBR' ],
+  [ 'Rb', 'BLLL' ],
+  [ 'Yb', '' ] ]
 ]
 
 for (let test of tests) {
   let result = puzzleFighter(test);
   // console.log(result.split('\n').map((r) => '|' + r + '|').join('\n'))
 }
+// [ [ 10, 0, 2, 3 ], [ 8, 0, 4, 2 ] ]
+
+//  [ 9, 1, 2, 2 ], [ 8, 2, 2, 2 ]
+
+// console.log(doOverlap([ 9, 1, 2, 2 ], [ 8, 2, 2, 2 ]))
