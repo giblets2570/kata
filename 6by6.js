@@ -1,3 +1,13 @@
+function getPermutations(a,n,s=[],t=[]){
+  return a.reduce((p,c,i,a) => {
+    n > 1
+      ? getPermutations(a.slice(0,i).concat(a.slice(i+1)), n-1, p, (t.push(c),t))
+      : p.push((t.push(c),t).slice(0));
+    t.pop();
+    return p;
+  }, s);
+}
+
 function solvePuzzle(clues) {
   // Start your coding here...
   let solution = Array(6).fill().map(() => Array(6).fill(0));
@@ -116,8 +126,10 @@ function solvePuzzle(clues) {
   let currentNum = 5;
 
   function recr(_solution, currentNum) {
-    let logging = currentNum === 3
-    // console.log()
+    let logging = currentNum === 2
+    console.log()
+    console.log('currentNum:',currentNum)
+    // console.log('currentNum === ', currentNum)
     let solution = _solution.map((r) => r.slice());
     // console.log()
     // console.log(solution, currentNum)
@@ -125,23 +137,26 @@ function solvePuzzle(clues) {
       console.log(formattedClues);
       solution = solution.map((r) => r.map((c) => c ? c : 1));
       console.log(solution);
-    }
-    if (currentNum === 0) {
-      // console.log(solution)
       if (check(solution, clues)) return solution;
       return false;
-    };
+    }
     // currentNum - 3
     // 7 - currentNum
     // this should be related to what is on the board
     // for 5 it is constant
+    // so should be next number in line - 4?
     let currentNumLimit = currentNum - 3;
     let round = 0;
     while (true) {
       if (round) {
         // Then add in the clues
+        let currentNumLimit;
         for (let i in formattedClues.topppp) {
           let clue = formattedClues.topppp[i];
+          let currentNumLimitIndex = solution.map((r) => r[i]).findIndex((r)=> r && r !== 9);
+          if (clue === 0 || currentNumLimitIndex === -1) continue;
+          currentNumLimit = clue - (6 - solution[i][currentNumLimitIndex]) - 1;
+          // console.log('currentNumLimit', currentNumLimit);
           if(clue < currentNumLimit) continue;
           for (let row = 0; row < clue - (7 - currentNum); row++) {
             if(!solution[row][i]) solution[row][i] = 9;
@@ -151,6 +166,10 @@ function solvePuzzle(clues) {
         if (logging) console.log(solution);
         for (let i in formattedClues.bottom) {
           let clue = formattedClues.bottom[i];
+          let currentNumLimitIndex = solution.slice().reverse().map((r) => r[i]).findIndex((r)=> r && r !== 9);
+          if (clue === 0 || currentNumLimitIndex === -1) continue;
+          currentNumLimit = clue - (6 - solution[i][5-currentNumLimitIndex]) - 1;
+          // console.log('currentNumLimit', currentNumLimit);
           if(clue < currentNumLimit) continue;
           for (let row = 0; row < clue - (7 - currentNum); row++) {
             if(!solution[5-row][i]) solution[5-row][i] = 9;
@@ -160,6 +179,9 @@ function solvePuzzle(clues) {
         if (logging) console.log(solution);
         for (let j in formattedClues.lefttt) {
           let clue = formattedClues.lefttt[j];
+          let currentNumLimitIndex = solution[j].findIndex((c)=> c && c !== 9);
+          if (clue === 0 || currentNumLimitIndex === -1) continue;
+          currentNumLimit = clue - (6 - solution[currentNumLimitIndex][j]) - 1;
           if(clue < currentNumLimit) continue;
           for (let col = 0; col < clue - (7 - currentNum); col++) {
             if(!solution[j][col]) solution[j][col] = 9;
@@ -169,6 +191,10 @@ function solvePuzzle(clues) {
         if (logging) console.log(solution);
         for (let j in formattedClues.rightt) {
           let clue = formattedClues.rightt[j];
+          let currentNumLimitIndex = solution[j].slice().reverse().findIndex((c)=> c && c !== 9);
+          console.log(currentNumLimitIndex)
+          if (clue === 0 || currentNumLimitIndex === -1) continue;
+          currentNumLimit = clue - (6 - solution[5-currentNumLimitIndex][j]) - 1;
           if(clue < currentNumLimit) continue;
           for (let col = 0; col < clue - (7 - currentNum); col++) {
             if(!solution[j][5-col]) solution[j][5-col] = 9;
@@ -186,9 +212,10 @@ function solvePuzzle(clues) {
             found = true;
           }
         }
+        if (logging) console.log('solution(row):', solution);
         for (let col = 0; col < 6; col++) {
           let column = solution.map((r) => r[col]);
-          if (column.filter((c) => c === 0).length === 1) {
+          if (column.filter((c) => c === 0).length === 1 && column.indexOf(currentNum) === -1) {
             let row = column.indexOf(0);
             if (solution[row].indexOf(currentNum) > -1) continue; // Check if row ok
             solution[row][col] = currentNum;
@@ -196,6 +223,7 @@ function solvePuzzle(clues) {
             found = true;
           }
         }
+        if (logging) console.log('solution(col):', solution);
         if (!found) {
           // console.log('round:', round);
           break;
@@ -226,16 +254,9 @@ function solvePuzzle(clues) {
       return solution[i].indexOf(currentNum) === -1;
     });
 
-    if (logging) console.log('currentNumLimit:', currentNumLimit)
     if (logging) console.log(solution)
     if (logging) console.log('allowedCols:', allowedCols)
     if (logging) console.log('allowedRows:', allowedRows)
-
-    if (currentNum === 3) {
-      console.log();
-      console.log(solution);
-      return false;
-    }
 
     let allowedPlacements = [];
     for (let row of allowedRows) {
@@ -245,35 +266,54 @@ function solvePuzzle(clues) {
         }
       }
     }
+    console.log(`allowedPlacements(${currentNum}):`, allowedPlacements)
 
     solution = solution.map((row) => row.map((c) => c === 9 ? 0 : c));
 
     let numAlready = solution.filter((r) => r.indexOf(currentNum) >= 0).length;
 
-    let toUsePlacements = allowedPlacements.reduce((c, _p) => {
-      let usedPlacements = [_p];
-      allowedPlacements.forEach((placement) => {
-        let any = usedPlacements.find((p) => (
-          p[0] === placement[0] ||
-          p[1] === placement[1]
-        ));
-        if (!any) usedPlacements.push(placement);
-      });
-      if (usedPlacements.length === 6 - numAlready) {
-        c[_p] = usedPlacements;
+    let toUsePlacements = getPermutations(allowedPlacements
+        .map((p) => String(p)), 6 - numAlready)
+        .filter((a) => {
+      let b = {};
+      for (let i = 0; i < allowedRows.length; i++) {
+        if (a[i][0] !== String(allowedRows[i])) return false;
+        if (b[a[i][2]]) return false;
+        b[a[i][2]] = true;
       }
-      return c;
-    }, {});
+      return true;
+    }).map((b) => {
+      return b.map((a) => {
+        return a.split(',').map((i) => parseInt(i));
+      });
+    });
 
-
-    // console.log(toUsePlacements, numAlready);
-
-    toUsePlacements = Object.keys(toUsePlacements).map((key) => toUsePlacements[key]);
     // console.log('currentNum:',currentNum);
     // console.log(solution);
     // console.log(toUsePlacements);
+    // console.log('currentNum:', currentNum);
+    if (currentNum === 5) {
+      toUsePlacements = toUsePlacements.filter((a) => {
+        return a[0][0] === 0 && a[0][1] === 0
+      });
+    }
+    if (currentNum === 4) {
+      toUsePlacements = toUsePlacements.filter((a) => {
+        return a[0][0] === 0 && a[0][1] === 3
+      });
+    }
+    if (currentNum === 3) {
+      toUsePlacements = toUsePlacements.filter((a) => {
+        return a[0][0] === 0 && a[0][1] === 4 && a[2][0] === 2 && a[2][1] === 1
+      });
+    }
+    console.log(`toUsePlacements(${currentNum}):`, toUsePlacements);
 
-    // console.log(toUsePlacements);
+    // if (currentNum === 2) {
+    //   console.log(formattedClues);
+    //   console.log(solution);
+    //   return false;
+    // }
 
     for(let usedPlacement of toUsePlacements) {
       for (let i = 0; i < usedPlacement.length; i++) {
@@ -373,17 +413,30 @@ function check(solution, clues) {
 }
 
 
-var clues = [ 0, 0, 0, 2, 2, 0,
-              0, 0, 0, 6, 3, 0,
-              0, 4, 0, 0, 0, 0,
-              4, 4, 0, 3, 0, 0];
+// var clues = [ 0, 0, 0, 2, 2, 0,
+//               0, 0, 0, 6, 3, 0,
+//               0, 4, 0, 0, 0, 0,
+//               4, 4, 0, 3, 0, 0];
+//
+// var expected = [[ 5, 6, 1, 4, 3, 2 ],
+//                 [ 4, 1, 3, 2, 6, 5 ],
+//                 [ 2, 3, 6, 1, 5, 4 ],
+//                 [ 6, 5, 4, 3, 2, 1 ],
+//                 [ 1, 2, 5, 6, 4, 3 ],
+//                 [ 3, 4, 2, 5, 1, 6 ]];
 
-var expected = [[ 5, 6, 1, 4, 3, 2 ],
-                [ 4, 1, 3, 2, 6, 5 ],
-                [ 2, 3, 6, 1, 5, 4 ],
-                [ 6, 5, 4, 3, 2, 1 ],
-                [ 1, 2, 5, 6, 4, 3 ],
-                [ 3, 4, 2, 5, 1, 6 ]];
+
+var clues = [ 3, 2, 2, 3, 2, 1,
+              1, 2, 3, 3, 2, 2,
+              5, 1, 2, 2, 4, 3,
+              3, 2, 1, 2, 2, 4];
+
+var expected = [[ 2, 1, 4, 3, 5, 6],
+                [ 1, 6, 3, 2, 4, 5],
+                [ 4, 3, 6, 5, 1, 2],
+                [ 6, 5, 2, 1, 3, 4],
+                [ 5, 4, 1, 6, 2, 3],
+                [ 3, 2, 5, 4, 6, 1]];
 
 // console.log(check(expected, clues));
 
