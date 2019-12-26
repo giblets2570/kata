@@ -113,13 +113,29 @@ function solvePuzzle(clues) {
     }
     if (!foundCol) break;
   }
-  // let currentNum = 5;
+  let currentNum = 5;
 
-  
-
-
-  for (let currentNum = 5; currentNum >= 5; currentNum--) {
-    let currentNumLimit = 7 - currentNum;
+  function recr(_solution, currentNum) {
+    let logging = currentNum === 3
+    // console.log()
+    let solution = _solution.map((r) => r.slice());
+    // console.log()
+    // console.log(solution, currentNum)
+    if (currentNum === 1) {
+      console.log(formattedClues);
+      solution = solution.map((r) => r.map((c) => c ? c : 1));
+      console.log(solution);
+    }
+    if (currentNum === 0) {
+      // console.log(solution)
+      if (check(solution, clues)) return solution;
+      return false;
+    };
+    // currentNum - 3
+    // 7 - currentNum
+    // this should be related to what is on the board
+    // for 5 it is constant
+    let currentNumLimit = currentNum - 3;
     let round = 0;
     while (true) {
       if (round) {
@@ -127,37 +143,46 @@ function solvePuzzle(clues) {
         for (let i in formattedClues.topppp) {
           let clue = formattedClues.topppp[i];
           if(clue < currentNumLimit) continue;
-          for (let row = 0; row < clue - currentNumLimit; row++) {
+          for (let row = 0; row < clue - (7 - currentNum); row++) {
             if(!solution[row][i]) solution[row][i] = 9;
           }
         }
+        if (logging) console.log('formattedClues.topppp', formattedClues.topppp);
+        if (logging) console.log(solution);
         for (let i in formattedClues.bottom) {
           let clue = formattedClues.bottom[i];
           if(clue < currentNumLimit) continue;
-          for (let row = 0; row < clue - currentNumLimit; row++) {
+          for (let row = 0; row < clue - (7 - currentNum); row++) {
             if(!solution[5-row][i]) solution[5-row][i] = 9;
           }
         }
+        if (logging) console.log('formattedClues.bottom', formattedClues.bottom);
+        if (logging) console.log(solution);
         for (let j in formattedClues.lefttt) {
           let clue = formattedClues.lefttt[j];
           if(clue < currentNumLimit) continue;
-          for (let col = 0; col < clue - currentNumLimit; col++) {
+          for (let col = 0; col < clue - (7 - currentNum); col++) {
             if(!solution[j][col]) solution[j][col] = 9;
           }
         }
+        if (logging) console.log('formattedClues.lefttt', formattedClues.lefttt);
+        if (logging) console.log(solution);
         for (let j in formattedClues.rightt) {
           let clue = formattedClues.rightt[j];
           if(clue < currentNumLimit) continue;
-          for (let col = 0; col < clue - currentNumLimit; col++) {
+          for (let col = 0; col < clue - (7 - currentNum); col++) {
             if(!solution[j][5-col]) solution[j][5-col] = 9;
           }
         }
+        if (logging) console.log('formattedClues.rightt', formattedClues.rightt);
+        if (logging) console.log(solution);
         // Check if there are any rows with only one 0
         let found = false;
         for (let row = 0; row < 6; row++) {
           if (solution[row].filter((c) => c === 0).length === 1) {
             let col = solution[row].indexOf(0);
-            solution[row][col] = 5;
+            solution[row][col] = currentNum;
+            // console.log('here row')
             found = true;
           }
         }
@@ -165,17 +190,21 @@ function solvePuzzle(clues) {
           let column = solution.map((r) => r[col]);
           if (column.filter((c) => c === 0).length === 1) {
             let row = column.indexOf(0);
-            solution[row][col] = 5;
+            if (solution[row].indexOf(currentNum) > -1) continue; // Check if row ok
+            solution[row][col] = currentNum;
+            // console.log('here col')
             found = true;
           }
         }
-        if (!found) break;
+        if (!found) {
+          // console.log('round:', round);
+          break;
+        }
       }
       // Lets add in where the 5s cant be
       for (let i = 0; i < solution.length; i++) {
         for (let j = 0; j < solution[i].length; j++) {
-          solution[i]
-          if (solution[i][j] === 5) {
+          if (solution[i][j] === currentNum) {
             for (let row = 0; row < 6; row++) {
               if(!solution[row][j]) solution[row][j] = 9;
             }
@@ -188,7 +217,6 @@ function solvePuzzle(clues) {
       round += 1;
     }
 
-    solution = solution.map((row) => row.map((c) => c === 9 ? 0 : c));
     let usedCols = solution.map((s) => s.indexOf(currentNum)).filter((s) => s !== -1);
     let allowedCols = new Set([0,1,2,3,4,5]);
     usedCols.forEach((s) => allowedCols.delete(s));
@@ -197,6 +225,17 @@ function solvePuzzle(clues) {
     let allowedRows = [0,1,2,3,4,5].filter((i) => {
       return solution[i].indexOf(currentNum) === -1;
     });
+
+    if (logging) console.log('currentNumLimit:', currentNumLimit)
+    if (logging) console.log(solution)
+    if (logging) console.log('allowedCols:', allowedCols)
+    if (logging) console.log('allowedRows:', allowedRows)
+
+    if (currentNum === 3) {
+      console.log();
+      console.log(solution);
+      return false;
+    }
 
     let allowedPlacements = [];
     for (let row of allowedRows) {
@@ -207,65 +246,53 @@ function solvePuzzle(clues) {
       }
     }
 
-    let toUsePlacements = allowedPlacements
-      .filter((p) => p[0] === allowedRows[0])
-      .map((p) => [p])
-      .map((p) => {
-        allowedPlacements.forEach((placement) => {
-          let any = p.find((p) => (
-            p[0] === placement[0] ||
-            p[1] === placement[1]
-          ));
-          if (!any) p.push(placement);
-        });
-        return p
+    solution = solution.map((row) => row.map((c) => c === 9 ? 0 : c));
+
+    let numAlready = solution.filter((r) => r.indexOf(currentNum) >= 0).length;
+
+    let toUsePlacements = allowedPlacements.reduce((c, _p) => {
+      let usedPlacements = [_p];
+      allowedPlacements.forEach((placement) => {
+        let any = usedPlacements.find((p) => (
+          p[0] === placement[0] ||
+          p[1] === placement[1]
+        ));
+        if (!any) usedPlacements.push(placement);
       });
+      if (usedPlacements.length === 6 - numAlready) {
+        c[_p] = usedPlacements;
+      }
+      return c;
+    }, {});
+
+
+    // console.log(toUsePlacements, numAlready);
+
+    toUsePlacements = Object.keys(toUsePlacements).map((key) => toUsePlacements[key]);
+    // console.log('currentNum:',currentNum);
+    // console.log(solution);
+    // console.log(toUsePlacements);
+
+    // console.log(toUsePlacements);
 
     for(let usedPlacement of toUsePlacements) {
       for (let i = 0; i < usedPlacement.length; i++) {
         let [row, col] = usedPlacement[i];
         solution[row][col] = currentNum;
-
+      }
+      if(solution.filter((r) => r.indexOf(currentNum) >= 0).length === 6) {
+        let result = recr(solution, currentNum - 1);
+        if (result) return result;
+      }
+      for (let i = 0; i < usedPlacement.length; i++) {
+        let [row, col] = usedPlacement[i];
+        solution[row][col] = 0;
       }
     }
+    return false;
   }
 
-  //
-  // recursive solution
-  // let currentNum = 5;
-  // let usedCols = solution.map((s) => s.indexOf(currentNum)).filter((s) => s !== -1);
-  // let allowedCols = new Set([0,1,2,3,4,5]);
-  // usedCols.forEach((s) => allowedCols.delete(s));
-
-  // function recr(solution, num, aCols) {
-  //   let cols = new Set(aCols); // passes by reference
-  //   if (cols.size === 0) {
-  //     num = num - 1;
-  //     if (num === 0) {
-  //       if (check(solution, clues)) return solution; // All the spaces are filled
-  //       return false;
-  //     }
-  //     let usedCols = solution.map((s) => s.indexOf(num)).filter((s) => s !== -1);
-  //     cols = new Set([0,1,2,3,4,5]);
-  //     usedCols.forEach((s) => cols.delete(s));
-  //   }
-  //   for (let i = 0; i < solution.length; i++) {
-  //     if (solution[i].includes(num)) continue;
-  //     let colArr = Array.from(cols);
-  //     for (let col of colArr) {
-  //       if (solution[i][col] > 0) continue;
-  //       cols.delete(col);
-  //       solution[i][col] = num;
-  //       // Need to check if I break any rules
-  //       let result = recr(solution, num, cols);
-  //       if (result) return result;
-  //       solution[i][col] = 0;
-  //       cols.add(col);
-  //     }
-  //   }
-  // }
-
-  // solution = recr(solution, currentNum, allowedCols);
+  solution = recr(solution, currentNum);
 
   return solution;
 }
