@@ -156,157 +156,94 @@ Compiler.prototype.pass2 = function (ast) {
   }
 };
 
-Compiler.prototype.pass3recr = function (ast, result, registers, stack) {
+Compiler.prototype.pass3recr = function (ast, result) {
   // return assembly instructions
-  // not the lowest level
-
-  switch(ast.op) {
-    case '*': {
-      if (ast.b.a) {
-        result.push('PU');
-        result = this.pass3recr(ast.b, result);
-        result.push('PO');
-        result.push('SW');
-        result.push('PO');
-      } else {
-        if (ast.b.op === 'imm') {
-          result.push(`IM ${ast.b.n}`)
-        } else {
-          result.push(`AR ${ast.b.n}`)
-        }
-      }
-      result.push('SW');
-      if (ast.a.a) {
-        result.push('PU');
-        result = this.pass3recr(ast.a, result);
-        result.push('PO');
-        result.push('SW');
-        result.push('PO');
-      } else {
-        if (ast.a.op === 'imm') {
-          result.push(`IM ${ast.a.n}`);
-        } else {
-          result.push(`AR ${ast.a.n}`);
-        }
-      }
-      result.push('MU');
-      result.push('PU');
-      break;
-    }
-    case '/': {
-      if (ast.b.a) {
-        result.push('PU');
-        result = this.pass3recr(ast.b, result);
-        result.push('PO');
-        result.push('SW');
-        result.push('PO');
-      } else {
-        if (ast.b.op === 'imm') {
-          result.push(`IM ${ast.b.n}`)
-        } else {
-          result.push(`AR ${ast.b.n}`)
-        }
-      }
-      result.push('SW');
-      if (ast.a.a) {
-        result.push('PU');
-        result = this.pass3recr(ast.a, result);
-        result.push('PO');
-        result.push('SW');
-        result.push('PO');
-      } else {
-        if (ast.a.op === 'imm') {
-          result.push(`IM ${ast.a.n}`);
-        } else {
-          result.push(`AR ${ast.a.n}`);
-        }
-      }
-      result.push('DI');
-      result.push('PU');
-      break;
-    }
-    case '+': {
-      if (ast.b.a) {
-        result.push('PU');
-        result = this.pass3recr(ast.b, result);
-        result.push('PO');
-        result.push('SW');
-        result.push('PO');
-      } else {
-        if (ast.b.op === 'imm') {
-          result.push(`IM ${ast.b.n}`)
-        } else {
-          result.push(`AR ${ast.b.n}`)
-        }
-      }
-      result.push('SW');
-      if (ast.a.a) {
-        result.push('PU');
-        result = this.pass3recr(ast.a, result);
-        result.push('PO');
-        result.push('SW');
-        result.push('PO');
-      } else {
-        if (ast.a.op === 'imm') {
-          result.push(`IM ${ast.a.n}`);
-        } else {
-          result.push(`AR ${ast.a.n}`);
-        }
-      }
-      result.push('AD');
-      result.push('PU');
-      break;
-    }
-    case '-': {
-      if (ast.b.a) {
-        result.push('PU');
-        result = this.pass3recr(ast.b, result);
-        result.push('PO');
-        result.push('SW');
-        result.push('PO');
-      } else {
-        if (ast.b.op === 'imm') {
-          result.push(`IM ${ast.b.n}`)
-        } else {
-          result.push(`AR ${ast.b.n}`)
-        }
-      }
-      result.push('SW');
-      if (ast.a.a) {
-        result.push('PU');
-        result = this.pass3recr(ast.a, result);
-        result.push('PO');
-        result.push('SW');
-        result.push('PO');
-      } else {
-        if (ast.a.op === 'imm') {
-          result.push(`IM ${ast.a.n}`);
-        } else {
-          result.push(`AR ${ast.a.n}`);
-        }
-      }
-      result.push('SU');
-      result.push('PU');
-      break;
-    }
-    default: break;
+  let a, b;
+  if (ast.a.op === 'imm') {
+    result.push(`IM ${ast.a.n}`);
+  } else if (ast.a.op === 'arg') {
+    result.push(`AR ${ast.a.n}`);
+  } else {
+    // console.log('SOMETHING?')
+    this.pass3recr(ast.a, result);
   }
-  // result.push('PU');
-  // result.push('PO');
+  if (ast.b.op === 'imm') {
+    result.push('SW');
+    result.push(`IM ${ast.b.n}`);
+  } else if (ast.b.op === 'arg') {
+    result.push('SW');
+    result.push(`AR ${ast.b.n}`);
+  } else {
+    result.push('PU');
+    this.pass3recr(ast.b, result);
+    result.push('SW');
+    result.push('PO');
+    result.push('SW');
+  }
+  if (result[result.length-1] === 'SW') {
+    result.pop()
+  } else {
+    result.push('SW');
+  }
+  if (ast.op === '*') {
+    result.push('MU');
+  }
+  if (ast.op === '+') {
+    result.push('AD');
+  }
+  if (ast.op === '-') {
+    result.push('SU');
+  }
+  if (ast.op === '/') {
+    result.push('DI');
+  }
   return result;
 }
 
 Compiler.prototype.pass3 = function (ast) {
 
-  let registers = [null, null];
-  let stack = [];
-  let result = this.pass3recr(ast, [], registers, stack);
-  result.push('PO');
+  let result = this.pass3recr(ast, []);
   return result;
 };
 
+function runProgram(p3) {
+  let registers = [null, null];
+  let stack = [];
+  let args = Array.prototype.slice.call(arguments, 1);
+  console.log('args:',args);
+  for (let command of p3) {
+    if (command === 'SW') {
+      registers = registers.reverse();
+    } else if (command.includes('IM ')) {
+      let num = parseInt(command.slice(3));
+      registers[0] = num;
+    } else if (command.includes('AR ')) {
+      let num = parseInt(command.slice(3));
+      registers[0] = args[num];
+    } else if (command === 'PU') {
+      if (registers[0] !== null) {
+        stack.push(registers[0]);
+      }
+    } else if (command === 'PO') {
+      let value = stack.pop();
+      if (value !== null) {
+        registers[0] = value;
+      }
+    } else if (command === 'AD') {
+      registers[0] = registers[0] + registers[1];
+    } else if (command === 'SU') {
+      registers[0] = registers[0] - registers[1];
+    } else if (command === 'MU') {
+      registers[0] = registers[0] * registers[1];
+    } else if (command === 'DI') {
+      registers[0] = registers[0] / registers[1];
+    }
+    console.log()
+    console.log('command:',command,'stack:',stack,'registers:',registers);
+  }
+}
 
-var prog = '[ x y z ] ( 2*3*x + 5*y - 3*z ) / (1 + 3 + 2*2)';
+var prog = '[ x y z ] ( 2*3*x + 5*y - 3*z ) / (1 + 3 + 2*2)';//' / (1 + 3 + 2*2)';
 // var prog = '[ x ] ( x + 2*5 )'
 // var prog = '[ x ] ( x + 2*5 ) / ( 4 + x )'
 // var t1 = JSON.stringify({"op":"/","a":{"op":"-","a":{"op":"+","a":{"op":"*","a":{"op":"*","a":{"op":"imm","n":2},"b":{"op":"imm","n":3}},"b":{"op":"arg","n":0}},"b":{"op":"*","a":{"op":"imm","n":5},"b":{"op":"arg","n":1}}},"b":{"op":"*","a":{"op":"imm","n":3},"b":{"op":"arg","n":2}}},"b":{"op":"+","a":{"op":"+","a":{"op":"imm","n":1},"b":{"op":"imm","n":3}},"b":{"op":"*","a":{"op":"imm","n":2},"b":{"op":"imm","n":2}}}});
@@ -320,8 +257,10 @@ console.log(prog);
 var p1 = c.pass1(prog);
 var p2 = c.pass2(p1);
 
-console.log(p2);
+console.log(JSON.stringify(p2, 1,2,3,4));
 
 var p3 = c.pass3(p2);
+
+runProgram(p3,2,3,5);
 
 console.log(JSON.stringify(p3));
