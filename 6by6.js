@@ -170,7 +170,7 @@ function solvePuzzle(clues) {
           }
           // console.log('count:', count, 'currentNumLimitIndex:', currentNumLimitIndex, );
           if(
-            currentNumLimitIndex > 1 &&
+            currentNumLimitIndex > 0 &&
             count === clue - 1
           ) {
             // console.log(column);
@@ -193,13 +193,35 @@ function solvePuzzle(clues) {
         if (logging) console.log(solution);
         for (let j in formattedClues.bottom) {
           let clue = formattedClues.bottom[j];
-          let currentNumLimitIndex = solution.slice().reverse().map((c) => c[j]).findIndex((r)=> r && r !== 9);
+          let column = solution.slice().reverse().map((c) => c[j]);
+          let currentNumLimitIndex = column.findIndex((r)=> r && r !== 9);
           if (clue === 0 || currentNumLimitIndex === -1) continue;
-          currentNumLimit = clue - (6 - solution[5-currentNumLimitIndex][j]) - 1;
-          // console.log('currentNumLimit', currentNumLimit);
-          if(clue < currentNumLimit) continue;
-          for (let row = 0; row < clue - (7 - currentNum); row++) {
-            if(!solution[5-row][j]) solution[5-row][j] = 9;
+
+          let count = 0;
+          let max = 0;
+          for (let row = 0; row < 6; row++) {
+            if (column[row] > max && column[row] && column[row] !== 9) {
+              count += 1;
+              max = column[row];
+            }
+          }
+
+          if(
+            currentNumLimitIndex > 0 &&
+            count === clue - 1
+          ) {
+            for (let i = 1; i < currentNumLimitIndex; i++) {
+              if (!solution[5-i][j]) {
+                solution[5-i][j] = 9;
+              }
+            }
+          } else {
+            currentNumLimit = clue - (6 - column[currentNumLimitIndex]) - 1;
+            // console.log('currentNumLimit', currentNumLimit);
+            if(clue < currentNumLimit) continue;
+            for (let row = 0; row < clue - (7 - currentNum); row++) {
+              if(!solution[5-row][j]) solution[5-row][j] = 9;
+            }
           }
         }
         if (logging) console.log('formattedClues.bottom', formattedClues.bottom);
@@ -318,13 +340,13 @@ function solvePuzzle(clues) {
     // console.log(solution);
     // console.log(toUsePlacements);
     // console.log('currentNum:', currentNum);
-    // console.log(`toUsePlacements(${currentNum}):`, toUsePlacements);
+    console.log(`toUsePlacements(${currentNum}):`, toUsePlacements);
 
-    // if (currentNum === 5) {
-    //   console.log(formattedClues);
-    //   console.log(solution);
-    //   return false;
-    // }
+    if (currentNum === 4) {
+      console.log(formattedClues);
+      console.log(solution);
+      return false;
+    }
 
     for(let usedPlacement of toUsePlacements) {
       for (let i = 0; i < usedPlacement.length; i++) {
