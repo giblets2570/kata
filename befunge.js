@@ -1,6 +1,7 @@
 function interpret(code) {
   console.log(code);
   let formattedCode = code.split('\n').map((l) => l.split(''));
+  console.log(formattedCode);
   let direction = 0;
   var output = "";
   let stack = [];
@@ -9,9 +10,9 @@ function interpret(code) {
   let directions = ['>','<','v','^'];
   let command = getCommand(current, formattedCode);
   let stringMode = false;
-  for (var i = 0; i < 50; i++) {
-  // while(true) {
-    console.log(command)
+  // for (var i = 0; i < 530; i++) {
+  while(true) {
+    // console.log(command)
     if (command === '"') {
       stringMode = !stringMode;
     } else if(stringMode) {
@@ -75,19 +76,16 @@ function interpret(code) {
       direction = (direction + 1) % 4;
     } else if (command === '.') {
       let a = stack.pop();
-      while(a !== undefined) {
-        output += String(a);
-        a = stack.pop();
-      }
+      output += String(a);
+      // while(a !== undefined) {
+      //   a = stack.pop();
+      // }
     } else if (command === ',') {
       let a = stack.pop();
-      while(a !== undefined) {
-        if (parseInt(a) > -1) {
-          output += String.fromCharCode(parseInt(a));
-        } else {
-          output += String(a);
-        }
-        a = stack.pop();
+      if (parseInt(a) > 9) {
+        output += String.fromCharCode(parseInt(a));
+      } else {
+        output += String(a);
       }
     } else if (command === '#') {
       move(current, direction, formattedCode);
@@ -107,11 +105,11 @@ function interpret(code) {
       let x = stack.pop();
       stack.push(formattedCode[y][x]);
     } else {
-      console.log(command);
+      console.log('command:',command);
     }
     move(current, direction, formattedCode);
     command = getCommand(current, formattedCode);
-    console.log(stack, output);
+    // console.log(stack, output);
   }
   return output;
 }
@@ -129,6 +127,7 @@ function move(current, direction, code) {
     case 3: current[0] = (current[0] + code.length - 1) % code.length; break; // move up
     default: break
   }
+  // console.log(current);
 }
 
 
@@ -136,4 +135,9 @@ function move(current, direction, code) {
 // console.log(interpret(`>25*"!dlroW olleH":v
 //                 v:,_@
 //                 >  ^`))
-console.log(interpret(`01->1# +# :# 0# g# ,# :# 5# 8# *# 4# +# -# _@`));
+// console.log(interpret(`01->1# +# :# 0# g# ,# :# 5# 8# *# 4# +# -# _@`));
+let p = `2>:3g" "-!v\\  g30          <
+ |!\`"&":+1_:.:03p>03g+:"&"\`|
+ @               ^  p3\\" ":<
+2 2345678901234567890123456789012345678`
+console.log(interpret(p))

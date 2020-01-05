@@ -42,7 +42,6 @@ Compiler.prototype.pass1recr = function (vars, expression) {
   } else {
     let i = 1;
     while(i < expression.length) {
-//       console.log(JSON.stringify(expression), i);
       if(['*','/'].includes(expression[i])) {
         let [a, op, b] = expression.slice(i-1, i+2);
         let tree = {op: op};
@@ -62,14 +61,12 @@ Compiler.prototype.pass1recr = function (vars, expression) {
           if (!vars.includes(b)) throw new Error("Not a valid");
           tree.b = { op: 'arg', n: vars.indexOf(b), }
         }
-//         console.log(expression.slice(i-1, i+2).length);
 
         expression.splice(i-1, 3, tree);
       } else {
         i += 2;
       }
     }
-//     console.log(JSON.stringify(expression));
     i = 1;
     while(i < expression.length) {
       if(['+','-'].includes(expression[i])) {
